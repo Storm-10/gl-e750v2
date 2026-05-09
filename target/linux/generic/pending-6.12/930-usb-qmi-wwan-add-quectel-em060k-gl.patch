@@ -1,0 +1,23 @@
+From: Olekhov Vasilii <olekhov@gmail.com>
+Subject: [PATCH] net: usb: qmi_wwan: add Quectel EM060K-GL (2c7c:030b)
+
+The Quectel EM060K-GL requires the host to assert DTR on USB interface 4
+(via SET_CONTROL_LINE_STATE class request) before its QMI service becomes
+responsive. Without QMI_WWAN_QUIRK_DTR the driver binds successfully —
+cdc-wdm0 and wwan0 are created, raw_ip=Y — but all uqmi requests time out.
+
+Present in GL.iNET GL-E750v2 (M.2 B-key slot, connected via USB).
+
+Signed-off-by: Olekhov Vasilii <olekhov@gmail.com>
+---
+ drivers/net/usb/qmi_wwan.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/drivers/net/usb/qmi_wwan.c
++++ b/drivers/net/usb/qmi_wwan.c
+@@ -1086,4 +1086,5 @@
+    {QMI_MATCH_FF_FF_FF(0x2c7c, 0x0125)},	/* Quectel EC25, EC20 R2.0  Mini PCIe */
+    {QMI_MATCH_FF_FF_FF(0x2c7c, 0x0306)},	/* Quectel EP06/EG06/EM06 */
++	{QMI_MATCH_FF_FF_FF(0x2c7c, 0x030b)},   /* Quectel EM060K-GL */
+    {QMI_MATCH_FF_FF_FF(0x2c7c, 0x0512)},	/* Quectel EG12/EM12 */
+    {QMI_MATCH_FF_FF_FF(0x2c7c, 0x0620)},	/* Quectel EM160R-GL */

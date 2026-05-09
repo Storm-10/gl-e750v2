@@ -1,0 +1,55 @@
+#!/bin/sh
+# Bind Quectel EM060K-GL (2c7c:030b) interface 4 to qmi_wwan and assert DTR.
+#
+# new_id probes ALL matching interfaces. To avoid stealing AT ports from
+# option, we wait for option to claim them first (ttyUSB0 appears), then
+# write new_id. Afterwards we unbind any interface except 4 that qmi_wwan
+# may have grabbed anyway.
+
+[ "$ACTION" = "add" ] || exit 0
+[ "$DEVTYPE" = "usb_device" ] || exit 0
+
+VID=$(cat /sys${DEVPATH}/idVendor 2>/dev/null)
+PID=$(cat /sys${DEVPATH}/idProduct 2>/dev/null)
+[ "$VID" = "2c7c" ] && [ "$PID" = "030b" ] || exit 0
+
+DEVNAME=$(basename /sys${DEVPATH})       # e.g. "1-1.2"
+BUS=$(cat /sys${DEVPATH}/busnum 2>/dev/null)
+DEV=$(cat /sys${DEVPATH}/devnum 2>/dev/null)
+USB_DEV=$(printf "/dev/bus/usb/%03d/%03d" "$BUS" "$DEV")
+
+(
+    # Wait for qmi_wwan module to register
+    i=0
+    while [ $i -lt 30 ] && [ ! -f /sys/bus/usb/drivers/qmi_wwan/new_id ]; do
+        sleep 1
+        i=$((i + 1))
+    done
+    [ -f /sys/bus/usb/drivers/qmi_wwan/new_id ] || exit 1
+
+    # Wait for option driver to claim AT interfaces (ttyUSB0 = interface 0).
+    # With option holding interfaces 0-3, new_id can only grab interface 4.
+    i=0
+    while [ $i -lt 15 ] && [ ! -c /dev/ttyUSB0 ]; do
+        sleep 1
+        i=$((i + 1))
+    done
+
+    # Bind qmi_wwan to the device; it will probe all interfaces
+    echo "2c7c 030b" > /sys/bus/usb/drivers/qmi_wwan/new_id 2>/dev/null
+    sleep 1
+
+    # Release any interface qmi_wwan grabbed other than interface 4
+    for iface_dir in /sys/bus/usb/drivers/qmi_wwan/"${DEVNAME}":1.*/; do
+        [ -d "$iface_dir" ] || continue
+        iface=$(basename "$iface_dir")
+        [ "$iface" = "${DEVNAME}:1.4" ] && continue
+        echo "$iface" > /sys/bus/usb/drivers/qmi_wwan/unbind 2>/dev/null
+    done
+
+    sleep 1
+
+    # Assert DTR on interface 4 to activate the modem's QMI service
+    qmi-dtr "$USB_DEV" 2>/dev/null
+    sleep 1
+) &
