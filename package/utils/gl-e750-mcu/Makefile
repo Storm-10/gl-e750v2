@@ -17,8 +17,8 @@ define Package/gl-e750-mcu
 	TITLE:=GL-E750 MCU and modem support
 	MAINTAINER:=Vasiliy Olekhov <olekhov@gmail.com>
 	DEPENDS:=@TARGET_ath79 +lua-eco +lua-eco-termios +lua-eco-ubus \
-	    +lua-eco-uci +lua-eco-log +lua-cjson-lua5.4 +libiwinfo-lua \
-	    +libuci-lua +kmod-usb-net-qmi-wwan +kmod-usb-serial-option +uqmi
+		+lua-eco-uci +lua-eco-log +lua-cjson-lua5.4 +libiwinfo-lua \
+		+libuci-lua +kmod-usb-net-qmi-wwan +kmod-usb-serial-option +uqmi
 endef
 
 define Package/gl-e750-mcu/description
@@ -30,8 +30,8 @@ define Package/gl-e750-mcu/description
 	- procd init script and UCI config for MCU daemon
 endef
 
-#define Build/Configure
-#endef
+define Build/Configure
+endef
 
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
@@ -40,9 +40,9 @@ endef
 
 define Build/Compile
 	$(MAKE) -C $(PKG_BUILD_DIR) \
-	    CC="$(TARGET_CC)" \
-	    CFLAGS="$(TARGET_CFLAGS) -Wall -O2" \
-	    LDFLAGS="$(TARGET_LDFLAGS)"
+		CC="$(TARGET_CC)" \
+		CFLAGS="$(TARGET_CFLAGS) -Wall -O2" \
+		LDFLAGS="$(TARGET_LDFLAGS)"
 endef
 
 define Package/gl-e750-mcu/install
