@@ -18,12 +18,13 @@ define Package/gl-e750-mcu
 	MAINTAINER:=Vasiliy Olekhov <olekhov@gmail.com>
 	DEPENDS:=@TARGET_ath79 +lua-eco +lua-eco-termios +lua-eco-ubus \
 		+lua-eco-uci +lua-eco-log +lua-cjson-lua5.4 +libiwinfo-lua \
-		+libuci-lua +kmod-usb-net-qmi-wwan +kmod-usb-serial-option +uqmi
+		+libuci-lua +kmod-usb-net-qmi-wwan +kmod-usb-serial-option \
+		+kmod-usb-serial-wwan +uqmi
 endef
 
 define Package/gl-e750-mcu/description
 	Provides:
-	- mcu-proto: C daemon for GL-E750 MCU (OLED, battery, power)
+	- mcu-proto: UART protocol tool for GL-E750 MCU (OLED, battery, power)
 	- qmi-dtr: DTR assertion tool for Quectel EM060K-GL QMI activation
 	- USB hotplug rules for Quectel EM060K-GL (2c7c:030b)
 	- wwan0 raw-ip configuration hook
@@ -49,6 +50,7 @@ define Package/gl-e750-mcu/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mcu-proto $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/qmi-dtr $(1)/usr/bin
+	$(INSTALL_BIN) ./files//mcu $(1)/usr/bin
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/mcu.init $(1)/etc/init.d/mcu
@@ -60,7 +62,7 @@ define Package/gl-e750-mcu/install
 	$(INSTALL_BIN) ./files/20-quectel-em060k $(1)/etc/hotplug.d/usb
 
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/net
-	$(INSTALL_BIN) ./files/20-wwan-up $(1)/etc/hotplug.d
+	$(INSTALL_BIN) ./files/20-wwan-up $(1)/etc/hotplug.d/net
 endef
 
 $(eval $(call BuildPackage,gl-e750-mcu))
