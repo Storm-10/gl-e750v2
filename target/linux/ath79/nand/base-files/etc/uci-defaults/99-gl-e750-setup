@@ -2,7 +2,7 @@
 # GL-E750 first-boot configuration
 
 BOARD=$(board_name)
-[[ "$BOARD" = "glinet,gl-e750" ]] || exit 0
+[ "$BOARD" = "glinet,gl-e750" ] || exit 0
 
 # WiFi: enable radios, bridge to lan, set SSIDs and password
 uci set wireless.default_radio0.disabled=0
