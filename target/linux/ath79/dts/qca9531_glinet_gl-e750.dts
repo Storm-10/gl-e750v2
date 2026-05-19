@@ -50,7 +50,7 @@
 		compatible = "qcom,ath10k";
 		reg = <0x0000 0 0 0 0>;
 		nvmem-cells = <&macaddr_art_0 2>, <&cal_art_5000>;
-		vmem-cell-names = "mac-address", "calibration";	};
+		nvmem-cell-names = "mac-address", "calibration";	};
 };
 
 &usb0 {
