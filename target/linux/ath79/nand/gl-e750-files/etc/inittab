@@ -1,0 +1,4 @@
+::sysinit:/etc/init.d/rcS S boot
+::shutdown:/etc/init.d/rcS K shutdown
+# Disable serial login on the system console. GL-E750 MCU uses ttyS0.
+#::askconsole:/usr/libexec/login.sh
