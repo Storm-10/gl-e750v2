@@ -18,7 +18,7 @@ define Package/gl-e750-mcu
 	MAINTAINER:=Vasiliy Olekhov <olekhov@gmail.com>
 	DEPENDS:=@TARGET_ath79 +lua-eco +lua-eco-termios +lua-eco-ubus \
 		+lua-eco-uci +lua-eco-log +lua-cjson-lua5.4 +libiwinfo-lua \
-		+libuci-lua +kmod-usb-net-qmi-wwan +kmod-usb-serial-option \
+		+kmod-usb-net-qmi-wwan +kmod-usb-serial-option \
 		+kmod-usb-serial-wwan +uqmi
 endef
 

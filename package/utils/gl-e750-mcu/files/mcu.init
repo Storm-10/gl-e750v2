@@ -11,7 +11,7 @@ start_service() {
     procd_open_instance
     procd_set_param command /usr/bin/eco /usr/bin/mcu
     # eco default paths first (Lua 5.4), then /usr/lib/lua as fallback (uci.so, iwinfo.so)
-    procd_set_param env LUA_CPATH=";;/usr/lib/lua/?.so"
+    # procd_set_param env LUA_CPATH=";;/usr/lib/lua/?.so"
     procd_set_param respawn 3600 10 0
     procd_set_param stdout 1
     procd_set_param stderr 1

@@ -7,8 +7,8 @@ local ubus = require 'eco.ubus'
 local log = require 'eco.log'
 local sys = require 'eco.sys'
 local cjson = require "cjson"
-local uci = require "uci"
-local iwinfo = require "iwinfo"
+local uci = require "eco.uci"
+-- local iwinfo = require "iwinfo"
 local bufio = require 'eco.bufio'
 
 local json_data_flag
@@ -307,7 +307,7 @@ local function get_serial_data(dev, baudrate, data)
         end
 
         if not result then
-            print('reade err:', err)
+            print('read err:', err)
         else
             print('read:', result)
             result_hander(result)
@@ -673,13 +673,23 @@ local function get_network_meth(out)
             out.method_nw = "cable"
         end
     elseif egress:match("^wlan") then
-        local s = iwinfo.info(egress)
-        if s and type(s) == "table" and s.ssid then
-            local ssid = #s.ssid > 16 and s.ssid:sub(1, 16) or s.ssid
+        -- local s = iwinfo.info(egress)
+        local fh = io.popen("iwinfo " .. iface .. " info 2>/dev/null")
+        if fh then
+            local iwi = fh:read("*a")
+            fh:close()
+            -- iwinfo output:  ESSID: "MyNetwork"  or  ESSID: unknown
+            local ssid = iwi:match('ESSID: "([^"]*)"')
+        end
+
+        if ssid then
+            local ssid = #ssid > 16 and ssid:sub(1, 16) or ssid
             out.method_nw = "repeater|" .. ssid
         else
             out.method_nw = "repeater"
         end
+        print("get_network_meth ssid:", ssid)
+        print("get_network_meth out.method_nw:", out.method_nw)
     end
 end
 
@@ -1632,8 +1642,8 @@ local function serial_init()
     local c = uci.cursor()
 
     local device, rate = get_mcu_serial_info()
-    dev = c:get("glconfig", "mcu", "dev") or device or "/dev/ttyUSB0"
-    baudrate = tonumber(c:get("glconfig", "mcu", "baudrate") or rate or "9600")
+    dev = c:get("glconfig", "mcu", "dev") or device or "/dev/ttyS0"
+    baudrate = tonumber(c:get("glconfig", "mcu", "baudrate") or rate or "115200")
     flock(lockfile)
     log.info("open %s for baudrate %d", dev, baudrate)
 end
