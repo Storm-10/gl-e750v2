@@ -1,0 +1,12 @@
+diff --git a/feeds/packages/lang/golang/golang-values.mk b/feeds/packages/lang/golang/golang-values.mk
+--- a/feeds/packages/lang/golang/golang-values.mk
++++ b/feeds/packages/lang/golang/golang-values.mk
+@@ -124,7 +124,7 @@
+   GOBOOTSTRAP_TOOLEXEC
+ 
+ 
+-GO_DEFAULT_VERSION:=1.26
++GO_DEFAULT_VERSION:=1.27
+ GO_HOST_VERSION:=$(patsubst golang%/host,%,$(filter golang%/host,$(PKG_BUILD_DEPENDS)))
+ ifeq ($(GO_HOST_VERSION),)
+   GO_HOST_VERSION:=$(GO_DEFAULT_VERSION)
