@@ -1,10 +1,8 @@
-src-git modemband https://github.com/obsy/modemband.git;main
-src-git modemdata https://github.com/obsy/modemdata.git;main
-src-git luci_modemband https://github.com/4IceG/luci-app-modemband.git;main
-src-git luci_modemdata https://github.com/4IceG/luci-app-modemdata.git;main
-src-git luci_3ginfo_lite https://github.com/4IceG/luci-app-3ginfo-lite.git;main
-src-git luci_sms_tool_js https://github.com/4IceG/luci-app-sms-tool-js.git;main
-src-git packages https://github.com/openwrt/packages.git
-src-git luci https://github.com/openwrt/luci.git
-src-git routing https://github.com/openwrt/routing.git
-src-git telephony https://github.com/openwrt/telephony.git
+src-git 5gmodem https://github.com/fildunsky/luci-app-5gmodem.git^v3.7.0
+src-git packages https://git.openwrt.org/feed/packages.git^093d551675b1119a06ef224d419905e8d6b2af1a
+src-git luci https://git.openwrt.org/project/luci.git^75a306df84a020c57a631ef5b4c02ace56d93387
+src-git routing https://git.openwrt.org/feed/routing.git^48c808034414a2112cf9d5261a20a320e8d0d170
+src-git telephony https://git.openwrt.org/feed/telephony.git^2618106d5846a4a542fdf5809f0d3ed228ce439b
+src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git^049aaf472e8ce7e423299d43a516b7092a25b381
+src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall2.git^26.10.20-1
+

@@ -87,6 +87,7 @@ sync_feeds_config() {
   fi
 }
 
+
 update_and_install_feeds() {
   reset_feed_worktrees
 
@@ -99,10 +100,12 @@ update_and_install_feeds() {
   (cd "${SRC_DIR_ABS}" && ./scripts/feeds install -a)
 }
 
+
 reset_feed_worktrees() {
   local feed
 
-  [[ -d "${SRC_DIR_ABS}/feeds" ]] || return
+  log "SRC_DIR_ABS: ${SRC_DIR_ABS}"
+  [[ -d "${SRC_DIR_ABS}/feeds" ]] || return 0
 
   while IFS= read -r feed; do
     log "Resetting feed worktree $(basename "${feed}")"
@@ -118,6 +121,7 @@ copy_custom_packages() {
     mkdir -p "${SRC_DIR_ABS}/package/custom"
     rsync -a --delete "${ROOT_DIR}/packages/" "${SRC_DIR_ABS}/package/custom/"
   fi
+  log "Done Copying custom packages"
 }
 
 clean_custom_packages() {
@@ -233,7 +237,9 @@ download_sources() {
 
 build_firmware() {
   local jobs
-  jobs="${JOBS:-$(nproc)}"
+  jobs=$(nproc)
+  log "Starting download"
+  cd "${SRC_DIR_ABS}" && make download
   log "Starting build with ${jobs} job(s)"
   if ! (cd "${SRC_DIR_ABS}" && make -j"${jobs}"); then
     log "Parallel build failed, retrying with verbose single-thread build"
