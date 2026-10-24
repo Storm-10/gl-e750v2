@@ -12,8 +12,9 @@ start_service() {
 	procd_set_param command /usr/bin/eco /usr/bin/mcu
 	procd_set_param env LUA_CPATH=";;/usr/lib/lua/?.so"
 	procd_set_param respawn 3600 10 0
-	procd_set_param stdout 1
-	procd_set_param stderr 1
+	# set to 1 for log debug output
+	procd_set_param stdout 0
+	procd_set_param stderr 0
 	procd_close_instance
 }
 
