@@ -4,9 +4,9 @@ START=95
 USE_PROCD=1
 
 start_service() {
-	/usr/bin/vpn-switch init
+	/usr/bin/awg-control init
 }
 
 reload_service() {
-	/usr/bin/vpn-switch reload
+	/usr/bin/awg-control reload
 }

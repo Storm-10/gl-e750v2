@@ -1,0 +1,93 @@
+#!/bin/sh
+# mcu-switch — GL-E750 slide switch and power-button gestures, MCU screen modules. Events: logread -e mcu-switch
+#   flip on|off [SEEN]   /etc/rc.button/BTN_0; flip and back within 'gesture' s = double flip
+#   long                 mcu daemon, power button held 3 s (MCU 'Power_Saving_on/off')
+#   meters | standby [on|off] | sms [new] | <module> on|off      actions; module = 'module' section in /etc/config/mcu
+# Actions: luci-app-5gmodem "Buttons" (btn_BTN_0 pressed/released/double, btn_power pressed) if configured there,
+# else /etc/config/mcu switch.cmd_on/cmd_off/cmd_double/cmd_long.
+[ -n "$MCU_NICE" ] || ! nice -n -10 true 2>/dev/null || MCU_NICE=1 exec nice -n -10 "$0" "$@"   # keep pace under load
+. /usr/share/mcu-switch/lib.sh
+B5=/usr/share/5gmodem/buttons.sh
+
+getcmd() {                                                                    # $1 on|off|double|long -> CMD, RUN
+   local b=BTN_0 s=$1
+   case $1 in on) s=pressed ;; off) s=released ;; long) b=power s=pressed ;; esac
+   if [ -x $B5 ] && uci -q get 5gmodem.btn_$b >/dev/null; then
+      CMD=$(uci -q get 5gmodem.btn_$b.$s) RUN="$B5 run $b $s ${SEEN:-0}"
+   else config_get CMD switch "cmd_$1"; RUN='sh -c "$CMD"'; fi
+}
+
+title() {                                                                     # CMD -> R1: instant first line
+   local n
+   case "$CMD" in '') R1="No action set"; return ;; *mcu-switch\ *) ;; *) R1="Running..."; return ;; esac
+   set -- ${CMD##*mcu-switch }
+   case $1 in
+      sms) R1="SMS" ;; meters) R1="Meters" ;; standby) R1="Standby mode" ;;
+      *) config_get n "$1" name "$1"; [ "$2" = on ] && n="$n starting" || n="$n stopping"
+         rj $((15 - ${#n})) 0s; R1="$n $R" ;;
+   esac
+}
+
+act() {                                                                       # run action $1 for gesture
+   getcmd "$1"
+   [ -n "$CMD" ] || { log "$1: no action set"; clr; exit 0; }
+   [ "$1" = double ] && [ "$K" = m ] && case "$CMD" in *mcu-switch\ meters*) clr; log "double flip: meters off"; exit 0 ;; esac
+   : > "$PID"; log "$1: $CMD"
+   read -r _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ NI _ < /proc/$$/stat           # action runs at normal priority
+   CMD=$CMD MCU_T0=$T0 MCU_NICE= nice -n $((-NI)) sh -c "$RUN" </dev/null >/dev/null 2>&1
+   RC=$?; [ "$RC" = 0 ] || [ "$RC" = 143 ] || err "$1: exit $RC: $CMD"           # 143: superseded
+}
+
+tosms() { echo "$1" > "$IN"; kill -USR1 "$OP" 2>/dev/null; log "SMS mode: $1"; }
+
+flip() {                                                                      # $1 on|off, $2 SEEN
+   local p k
+   [ -c "$TTY" ] || { err "flip $1: $TTY is not a tty"; exit 1; }
+   owner; p= k=; [ -f "$PEND" ] && read -r p k < "$PEND"
+   if [ "${2:-0}" -lt "$GEST" ] && [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then    # flip back in time
+      echo "g $k" > "$PEND"; log "flip $1 (SEEN ${2:-?}s): double flip"
+      [ "$k" = s ] || { getcmd double; title; send "$R1"; }
+      exit 0
+   fi
+   now; T0=$UPC DL=$UPC
+   if [ "$OK" = s ]; then                                                      # SMS mode gets the flip at once
+      echo "$$ s" > "$PEND"; log "flip $1 (SEEN ${2:-?}s)"; tosms flip
+      tick "$GEST"; read -r p _ < "$PEND"; : > "$PEND"; [ "$p" = g ] && { owner; tosms double; }
+      exit 0
+   fi
+   K=$OK; own f; echo "$$ $K" > "$PEND"
+   getcmd "$1"; title; send "$R1"; log "flip $1 (SEEN ${2:-?}s)"
+   tick "$GEST"; read -r p _ < "$PEND"; : > "$PEND"
+   if [ "$p" = g ]; then act double; elif [ "$p" = $$ ]; then act "$1"; fi
+}
+
+meters() {                                                                    # bandwidth, conns, load/CPU, mem for MTO s
+   own m; elapsed; END=$((UP + MTO)); log "meters on for ${MTO}s"
+   trap 'log "meters off: superseded"; exit 0' TERM INT HUP
+   metrics; tick 1; metrics
+   while [ "$UP" -lt "$END" ]; do
+      scan; rows; bw "$RXM" "$TXM"; send "$R1" "$R2" "$R3" "$R4"; tick; metrics
+   done
+   clr; log "meters off: ${MTO}s timeout"
+}
+
+standby() {                                                                   # [on|off], default toggle; as mcu daemon power_saving_mode
+   local w r
+   case $1 in on) w=1 ;; off) w=0 ;; *) [ "$(uci -q get mcu.global.power_saveing)" = 1 ] && w=0 || w=1 ;; esac
+   [ $w = 1 ] && r=ON || r=OFF
+   own t; send "Standby mode $r"; log "standby $r"
+   for o in wireless.radio0.disabled wireless.radio1.disabled network.wan.disabled mcu.global.power_saveing; do uci set $o=$w; done
+   uci commit wireless; uci commit network; uci commit mcu; sync
+   if [ $w = 1 ]; then ifdown wan; wifi down; else ifup wan; wifi up; fi
+   nap 5; clr
+}
+
+case "$1" in
+   flip)    case "$2" in on|off) flip "$2" "$3" ;; *) exit 2 ;; esac ;;
+   long)    owner; if [ "$OK" = s ]; then tosms long; else now; T0=$UPC; K=$OK; log "long press"; act long; fi ;;
+   meters)  meters ;;
+   standby) standby "$2" ;;
+   sms)     . /usr/share/mcu-switch/sms.sh ;;
+   *)       if [ -n "$1" ] && [ "$(uci -q get "mcu.$1")" = module ]; then . /usr/share/mcu-switch/module.sh
+            else echo "usage: $0 flip on|off [SEEN] | long | meters | standby [on|off] | sms [new] | <module> on|off" >&2; exit 2; fi ;;
+esac

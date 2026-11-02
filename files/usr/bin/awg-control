@@ -1,15 +1,16 @@
 #!/bin/sh
+# awg-control on|off: AmneziaWG full tunnel (on) or split routes only (off) for the LAN subnet
 
-interface="$(uci -q get mcu.global.vpn_interface)"
-vpn_zone="$(uci -q get mcu.global.vpn_zone)"
-lan_subnet="$(uci -q get mcu.global.vpn_lan_subnet)"
-lan_device="$(uci -q get mcu.global.vpn_lan_device)"
-route_table="$(uci -q get mcu.global.vpn_route_table)"
-rule_priority="$(uci -q get mcu.global.vpn_rule_priority)"
+interface="$(uci -q get awg-control.main.interface)"
+vpn_zone="$(uci -q get awg-control.main.zone)"
+lan_subnet="$(uci -q get awg-control.main.lan_subnet)"
+lan_device="$(uci -q get awg-control.main.lan_device)"
+route_table="$(uci -q get awg-control.main.route_table)"
+rule_priority="$(uci -q get awg-control.main.rule_priority)"
 list_dir=/etc/split-routes
-batch_file=/tmp/vpn-switch.routes
-state_file=/tmp/vpn-switch.state
-switch_file=/tmp/vpn-switch.switch
+batch_file=/tmp/awg-control.routes
+state_file=/tmp/awg-control.state
+switch_file=/tmp/awg-control.switch
 
 [ -n "$interface" ] || interface=awg0
 [ -n "$vpn_zone" ] || vpn_zone=vpn
@@ -19,8 +20,8 @@ switch_file=/tmp/vpn-switch.switch
 [ -n "$rule_priority" ] || rule_priority=10000
 
 log_error() {
-	logger -t vpn-switch -p user.err "$*"
-	echo "vpn-switch: $*" >&2
+	logger -t awg-control -p user.err "$*"
+	echo "awg-control: $*" >&2
 }
 
 validate_main_route() {
@@ -110,7 +111,7 @@ load_lists() {
 		return 1
 	}
 
-	logger -t vpn-switch \
+	logger -t awg-control \
 		"loaded $(wc -l <"$batch_file") routes into table $route_table"
 }
 
@@ -118,7 +119,6 @@ apply_mode() {
 	local switch_state
 	local mode
 
-	ensure_firewall || return 1
 	switch_state="$(cat "$switch_file" 2>/dev/null || echo off)"
 
 	if ! interface_is_up; then
@@ -136,7 +136,7 @@ apply_mode() {
 	fi
 
 	echo "$mode" >"$state_file"
-	logger -t vpn-switch \
+	logger -t awg-control \
 		"mode=$mode switch=$switch_state interface=$interface lan=$lan_subnet iif=$lan_device table=$route_table"
 }
 
@@ -157,9 +157,12 @@ show_status() {
 	ip -4 route show table main default
 }
 
+case "$1" in on|off|init|reload|sync|wan) exec 9>/var/lock/awg-control.lock; flock 9 ;; esac
+
 case "$1" in
 	init)
 		[ -f "$switch_file" ] || echo off >"$switch_file"
+		ensure_firewall || exit 1
 		apply_mode
 		;;
 	reload|sync)
@@ -171,13 +174,13 @@ case "$1" in
 	wan)
 		remove_policy
 		echo wan >"$state_file"
-		logger -t vpn-switch "mode=wan interface=$interface"
+		logger -t awg-control "mode=wan interface=$interface"
 		;;
 	status)
 		show_status
 		;;
 	*)
-		echo "usage: vpn-switch init|reload|sync|on|off|wan|status" >&2
+		echo "usage: awg-control init|reload|sync|on|off|wan|status" >&2
 		exit 2
 		;;
 esac
