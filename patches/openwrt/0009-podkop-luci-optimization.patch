@@ -1,0 +1,42 @@
+diff --git a/luci-app-podkop/htdocs/luci-static/resources/view/podkop/main.js b/luci-app-podkop/htdocs/luci-static/resources/view/podkop/main.js
+--- a/feeds/podkop/luci-app-podkop/htdocs/luci-static/resources/view/podkop/main.js
++++ b/feeds/podkop/luci-app-podkop/htdocs/luci-static/resources/view/podkop/main.js
+@@ -1516,6 +1516,8 @@ var PodkopLogWatcher = class _PodkopLogWatcher {
+       logger.debug("[PodkopLogWatcher]", "skipped check \u2014 tab not visible");
+       return;
+     }
++    if (this.busy) return;
++    this.busy = true;
+     try {
+       const raw = await this.fetcher();
+       const lines = raw.split("\n").filter(Boolean);
+@@ -1531,6 +1533,8 @@ var PodkopLogWatcher = class _PodkopLogWatcher {
+       }
+     } catch (err) {
+       logger.error("[PodkopLogWatcher]", "failed to read logs:", err);
++    } finally {
++      this.busy = false;
+     }
+   }
+   start() {
+@@ -1590,7 +1594,7 @@ function coreService() {
+       return "";
+     },
+     {
+-      intervalMs: 3e3,
++      intervalMs: 3e4,
+       onNewLog: (line) => {
+         if (line.toLowerCase().includes("[error]") || line.toLowerCase().includes("[fatal]")) {
+           ui.addNotification("Podkop Error", E("div", {}, line), "error");
+diff --git a/podkop/files/usr/bin/podkop b/podkop/files/usr/bin/podkop
+--- a/feeds/podkop/podkop/files/usr/bin/podkop
++++ b/feeds/podkop/podkop/files/usr/bin/podkop
+@@ -1821,7 +1821,7 @@ check_logs() {
+     fi
+ 
+     local logs
+-    logs=$(logread | grep -E "podkop|sing-box")
++    logs=$(logread -l 1000 | grep -E "podkop|sing-box")
+ 
+     if [ -z "$logs" ]; then
+         nolog "Logs not found"
