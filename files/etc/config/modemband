@@ -1,9 +1,0 @@
-
-config modemband
-	option iface 'wan'
-	option set_port '/dev/ttyUSB3'
-	option modemid '2c7c030bEM060K-GL'
-	option wanrestart '0'
-	option modemrestart '0'
-	option restartcmd 'AT+CFUN=1,1'
-	option notify '0'

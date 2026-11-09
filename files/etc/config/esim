@@ -1,8 +1,0 @@
-config esim 'main'
-	option enabled '0'
-	option backend ''
-	option qmi_device '/dev/cdc-wdm0'
-	option qmi_slot '1'
-	option at_device ''
-	option imei ''
-	option debug '0'
