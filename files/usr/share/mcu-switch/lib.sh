@@ -1,11 +1,12 @@
 # /usr/share/mcu-switch/lib.sh — shared by /usr/bin/mcu-switch and its modules (sourced, busybox ash)
 # Screen: 'msg' frames (4x16) written straight to the MCU tty, 20 s pop-up or until the next frame.
-PID=/tmp/mcu-switch.pid PEND=/tmp/mcu-switch.pend IN=/tmp/mcu-switch.in
+PID=/tmp/mcu-switch.pid PEND=/tmp/mcu-switch.pend IN=/tmp/mcu-switch.in GEN=/tmp/mcu-switch.gen ARGS="$*"
 . /lib/functions.sh
 config_load mcu
 config_get REFRESH switch refresh 2
 config_get GEST    switch gesture 2
 config_get MTO     switch meters_timeout 600
+config_get MTO     switch metrics_timeout "$MTO"
 config_get IFACE   switch iface wwan0
 TTY=${MCU_TTY:-$(uci -q get glconfig.mcu.dev)} || TTY=/dev/ttyS0
 NET=/sys/class/net/$IFACE/statistics CT=/proc/net/nf_conntrack; [ -r $CT ] || CT=/dev/null
@@ -17,17 +18,20 @@ err() { logger -t mcu-switch -p user.err "$*"; }
 now() { read -r UPC _ < /proc/uptime; UP=${UPC%.*}; UPC=$UP${UPC#*.}; }      # s and cs, no fork
 rj()  { R=$2; while [ ${#R} -lt "$1" ]; do R=" $R"; done; }                 # right-justify $2 to $1 -> R
 lj()  { R=$2; while [ ${#R} -lt "$1" ]; do R="$R "; done; }                 # left-justify
-nap() {                                                                       # sleep; returns at once on a trapped signal
-   sleep "$1" 2>/dev/null & SP=$!; wait $SP; set -- $? "$1"; kill $SP 2>/dev/null
-   [ "$1" = 1 ] && case $2 in *.*) sleep $((${2%.*} + 1)) ;; esac                # busybox sleep: no fractions
-   return 0
+nap() {                                                                       # sleep $1 s; returns at once on a trapped signal
+   case $1 in                                                                 # OpenWrt busybox sleep: no fractions -> ucode
+      *.*) set -- "${1#*.}000" "${1%.*}"; set -- "${1%"${1#???}"}" "$2"
+           ucode -e "sleep($((${2:-0} * 1000 + 1$1 - 1000)))" 2>/dev/null & ;;
+      *)   sleep "$1" 2>/dev/null & ;;
+   esac
+   SP=$!; wait $SP; kill $SP 2>/dev/null; return 0
 }
 
 tick() {                                                                      # sleep to deadline: $1 s (REFRESH) after last
    local r
    now; DL=$((DL + ${1:-$REFRESH} * 100)); r=$((DL - UPC))
    [ "$r" -gt 0 ] || { DL=$UPC; return 0; }                                   # late: resync
-   nap $((r / 100)).$((r % 100 / 10))
+   nap $((r / 100)).$((r % 100 / 10))$((r % 10))
 }
 
 num() {                                                                       # $1 bps / unit $2 -> R: 123, 12.3, 0.123
@@ -49,7 +53,7 @@ bw() {                                                                        # 
    lj $((1 + ${#a} + o)) "v$a"; a=$R; lj $((g - o)) "^$b"; R1="$a$R$u"
 }
 
-metrics() {                                                                   # CPU% since last call, load, mem, rates
+sample() {                                                                    # CPU% since last call, load, mem, rates
    local a b c d e f g t k v
    now; DT=$((UPC - PU)); PU=$UPC
    read -r _ a b c d e f g _ < /proc/stat
@@ -59,7 +63,7 @@ metrics() {                                                                   # 
    while read -r k v _; do [ "$k" = MemAvailable: ] && break; done < /proc/meminfo
    MEM=$((v / 1024)).$((v % 1024 * 10 / 1024))M
    RXM=- TXM=-
-   read -r a < "$NET/rx_bytes" && read -r b < "$NET/tx_bytes" || { PRX=; return 0; }
+   read -r a 2>/dev/null < "$NET/rx_bytes" && read -r b < "$NET/tx_bytes" || { PRX=; return 0; }
    [ -n "$PRX" ] && [ "$DT" -gt 0 ] && RXM=$((a > PRX ? (a - PRX) * 800 / DT : 0)) TXM=$((b > PTX ? (b - PTX) * 800 / DT : 0))
    PRX=$a PTX=$b
 }
@@ -97,13 +101,35 @@ rows() {                                                                      # 
    rj 7 "$MEM"; R4="Mem avail$R"
 }
 
+mine() { [ -z "$ME" ] && return 0; read -r p _ 2>/dev/null < "$PID"; [ "$p" = "$ME" ] || { log "screen lost: exit"; exit 0; }; }
 send() {                                                                      # rows -> MCU pop-up (20 s or until next)
-   printf "{\"msg\": \"%-16.16s%-16.16s%-16.16s%-16.16s\"}" "$@" > "$TTY" || [ -n "$WE" ] || { WE=1; err "cannot write $TTY"; }
+   mine; printf "{\"msg\": \"%-16.16s%-16.16s%-16.16s%-16.16s\"}" "$@" > "$TTY" || [ -n "$WE" ] || { WE=1; err "cannot write $TTY"; }
 }
-clr() { printf '{"msg": " "}' > "$TTY"; }                                     # dismiss pop-up: standard screens return
+clr() { mine; printf '{"msg": " "}' > "$TTY"; }                                     # dismiss pop-up: standard screens return
 owner() { OP= OK=; [ -f "$PID" ] && read -r OP OK < "$PID"; [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null || OP= OK=; }
-own() {                                                                       # take the screen as kind $1: f flip, r module, m meters, s SMS, t standby
-   owner; echo "$$ $1" > "$PID"; [ -n "$OP" ] && [ "$OP" != $$ ] && kill "$OP" 2>/dev/null
+own() {                                                                       # take the screen as kind $1: f flip, r module, m metrics, s SMS, t standby
+   [ -n "$MCU_GEN" ] && { read -r p 2>/dev/null < "$GEN"; [ "$p" = "$MCU_GEN" ] || { log "$ARGS: superseded sequence: skipped"; exit 0; }; }
+   echo "${MCU_GEN:-$$}" > "$GEN"                                             # gesture sequence id: a later one skips our next calls
+   owner; echo "$$ $1" > "$PID"; ME=$$; [ -n "$OP" ] && [ "$OP" != $$ ] && kill "$OP" 2>/dev/null
    trap '[ -s "$PID" ] && read -r p _ < "$PID" && [ "$p" = $$ ] && : > "$PID"' EXIT
+}
+SIG=/tmp/mcu-switch.sig
+sig() {                                                     # $1 name, $2 value, $3..$4 scale (5gtop) -> R "RSRP-103 ###-"
+   local v=${2#+} h b=
+   v=${v%%.*}
+   case $v in ''|-|*[!0-9-]*|?*-*) R="$1 --"; return ;; esac
+   h=$(((v - $3) * 100 / ($4 - $3))); [ "$h" -lt 0 ] && h=0; [ "$h" -gt 100 ] && h=100; h=$((h * 14 / 100))
+   while [ "$h" -gt 1 ]; do b="$b#"; h=$((h - 2)); done; [ "$h" = 1 ] && b="$b-"   # '#' 1/7, '-' 1/14 of scale
+   [ ${#v} -ge 4 ] || { lj 4 " $v"; v=$R; }
+   R="$1$v $b"
+}
+signal() {                                                  # R1..R4: RSRP RSRQ SINR RSSI from 5gmodem, as 5gtop
+   local P= Q= S= I= n
+   [ -x /usr/share/5gmodem/5gmodem.sh ] && { [ -n "$FP" ] && kill -0 "$FP" 2>/dev/null || {
+      read -r _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ n _ < /proc/$$/stat          # poll at normal priority
+      SW_BG=1 nice -n $((-n)) /usr/share/5gmodem/5gmodem.sh cached 10 </dev/null > $SIG.t 2>/dev/null \
+         && grep -q '"rsrp"' $SIG.t && mv $SIG.t $SIG & FP=$!; }; }
+   [ -s $SIG ] && eval "$(jsonfilter -i $SIG -e 'P=@.rsrp' -e 'Q=@.rsrq' -e 'S=@.sinr' -e 'I=@.rssi' 2>/dev/null)"
+   sig RSRP "$P" -130 -80; R1=$R; sig RSRQ "$Q" -20 -3; R2=$R; sig SINR "$S" -10 20; R3=$R; sig RSSI "$I" -110 -50; R4=$R
 }
 elapsed() { now; T0=${MCU_T0:-$UPC} DL=$UPC; EL=$(((UPC - T0) / 100)); }      # counter continues from the flip

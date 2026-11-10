@@ -582,7 +582,8 @@ local function get_modem_info(out)
 
     local wan_st = ubus.call("network.interface.wan", "status", {})
     out.modem_up = (wan_st and wan_st.up) and "1" or "0"
-    out.sms = "0"
+    local sj = file.readfile("/tmp/5gmodem/sms_new.json") -- luci-app-5gmodem; > 0: SMS icon
+    out.sms = sj and sj:match('^{"count":(%d+)') or "0"
 end
 
 local function get_router_info(out)
@@ -611,17 +612,41 @@ local function get_router_info(out)
     c:close()
 end
 
+local function pw_on(c) -- Passwall2 enabled and its core running
+    if c:get("passwall2", "@global[0]", "enabled") ~= "1" then return false end
+    local fh = io.popen("pidof xray sing-box 2>/dev/null")
+    local p = fh and fh:read("*l")
+    if fh then fh:close() end
+    return p ~= nil and p ~= ""
+end
+
 local function get_vpn_info(out)
     local c = uci.cursor()
     local configured_if = c:get("mcu", "global", "vpn_interface")
 
     if configured_if and configured_if ~= "" then
         local status = ubus.call("network.interface." .. configured_if, "status", {})
+        local pw = pw_on(c)
+        if pw and not (status and status.up) then
+            out.vpn_type = "openvpn" -- VPN screen: "openvpn PassWall"
+            out.vpn_server = "PassWall"
+            out.vpn_status = "connected"
+        end
         if status and status.up then
             out.vpn_iface = configured_if
             out.vpn_type = "amneziawg"
-            out.vpn_server = configured_if
-            out.vpn_status = "connected"
+            local mode = (file.readfile("/tmp/awg-control.state") or ""):gsub("%s+$", "")
+            mode = ({ full = "full tunnel", split = "split tunnel" })[mode] or mode   -- "awg split tunnel"
+            out.vpn_server = configured_if .. " " .. mode .. (pw and " +PassWall" or "")
+            out.vpn_status = "connecting"   -- until a peer handshake within 3 min
+            local fh = io.popen("awg show " .. (status.l3_device or configured_if) .. " latest-handshakes 2>/dev/null")
+            if fh then
+                local now = os.time()
+                for t in fh:read("*a"):gmatch("%s(%d+)") do
+                    if now - tonumber(t) < 180 then out.vpn_status = "connected" end
+                end
+                fh:close()
+            end
 
             if status["ipv4-address"] and status["ipv4-address"][1] then
                 local address = status["ipv4-address"][1]

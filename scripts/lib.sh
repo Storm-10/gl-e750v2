@@ -19,6 +19,8 @@ load_build_env() {
   # shellcheck disable=SC1090
   source "${BUILD_ENV_FILE}"
 
+  export RELEASE_VERSION="${RELEASE_VERSION:?RELEASE_VERSION unset}"
+
   export OPENWRT_REPO="${OPENWRT_REPO:-https://github.com/openwrt/openwrt.git}"
   export OPENWRT_REF="${OPENWRT_REF:-v25.12.4}"
   export OPENWRT_TARGET="${OPENWRT_TARGET:-ath79}"
@@ -87,7 +89,6 @@ sync_feeds_config() {
   fi
 }
 
-
 update_and_install_feeds() {
   reset_feed_worktrees
 
@@ -100,6 +101,11 @@ update_and_install_feeds() {
   (cd "${SRC_DIR_ABS}" && ./scripts/feeds install -a)
 }
 
+# for XRay from passwall
+force_passwall_packages() {
+  log "Installing feed: -a -f -p passwall_packages"
+  (cd "${SRC_DIR_ABS}" && ./scripts/feeds install -a -f -p passwall_packages)
+}
 
 reset_feed_worktrees() {
   local feed
@@ -120,6 +126,10 @@ copy_custom_packages() {
     rm -rf "${SRC_DIR_ABS}/package/custom"
     mkdir -p "${SRC_DIR_ABS}/package/custom"
     rsync -a --delete "${ROOT_DIR}/packages/" "${SRC_DIR_ABS}/package/custom/"
+    find "${ROOT_DIR}/packages" -mindepth 2 -maxdepth 2 -name Makefile -printf '%h\n' |
+      xargs -rn1 basename | while read -r pkg; do
+        rm -f "${SRC_DIR_ABS}"/package/feeds/*/"${pkg}"
+      done
   fi
   log "Done Copying custom packages"
 }
@@ -224,9 +234,21 @@ save_optional_build_cache() {
   rsync -a --delete "${SRC_DIR_ABS}/staging_dir/" "${BUILD_CACHE_DIR_ABS}/staging_dir/"
 }
 
+install_apk_signing_key() {
+  [[ -n "${APK_SIGN_KEY:-}" ]] || { log "APK_SIGN_KEY unset, random key will be used"; return 0; }
+  printf '%s\n' "${APK_SIGN_KEY}" > "${SRC_DIR_ABS}/private-key.pem"
+  chmod 600 "${SRC_DIR_ABS}/private-key.pem"
+  rm -f "${SRC_DIR_ABS}/public-key.pem"
+}
+
 write_dot_config() {
   log "Generating .config from diffconfig"
   cp "${ROOT_DIR}/config/diffconfig" "${SRC_DIR_ABS}/.config"
+    cat >> "${SRC_DIR_ABS}/.config" <<EOF
+CONFIG_IMAGEOPT=y
+CONFIG_VERSIONOPT=y
+CONFIG_VERSION_CODE="gl-e750-${RELEASE_VERSION}"
+EOF
   (cd "${SRC_DIR_ABS}" && make defconfig)
 }
 
@@ -245,6 +267,17 @@ build_firmware() {
     log "Parallel build failed, retrying with verbose single-thread build"
     (cd "${SRC_DIR_ABS}" && make -j1 V=s)
   fi
+}
+
+collect_release_assets() {
+  local src="${SRC_DIR_ABS}/bin/targets/${OPENWRT_TARGET}/${OPENWRT_SUBTARGET}"
+  local old="openwrt-${OPENWRT_TARGET}-${OPENWRT_SUBTARGET}-${OPENWRT_PROFILE}"
+  local new="openwrt-gl-e750-${RELEASE_VERSION}"
+  local out="${ROOT_DIR}/release" f
+  rm -rf "${out}" && mkdir -p "${out}"
+  for f in "${src}/${old}"*; do cp "${f}" "${out}/${new}${f##*/${old}}"; done
+  (cd "${out}" && sha256sum -- * > sha256sums)
+  log "Artifacts should be under ${out}"
 }
 
 print_artifact_hint() {

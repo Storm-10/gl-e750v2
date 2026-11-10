@@ -1,5 +1,5 @@
 config main 'main'
-	option interface 'awg0'
+	option interface 'awg'
 	option zone 'vpn'
 	option lan_subnet '192.168.201.0/24'
 	option lan_device 'br-lan'

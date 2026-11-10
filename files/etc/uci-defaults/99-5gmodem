@@ -1,0 +1,32 @@
+#!/bin/sh
+
+uci -q batch <<'EOF'
+
+set 5gmodem.@5gmodem[0].esim_apdu='uqmi'
+
+set 5gmodem.sms.lednotify='1'
+set 5gmodem.sms.smsled='mcu'
+
+set 5gmodem.btn_power=button
+set 5gmodem.btn_power.name='power'
+set 5gmodem.btn_power.ct_pressed='conditional'
+set 5gmodem.btn_power.pressed='/usr/bin/mcu-switch standby'
+set 5gmodem.btn_BTN_0=button
+set 5gmodem.btn_BTN_0.name='BTN_0'
+set 5gmodem.btn_BTN_0.en_pressed='0'
+set 5gmodem.btn_BTN_0.ct_pressed='simple'
+set 5gmodem.btn_BTN_0.pressed='/usr/bin/mcu-switch pw on'
+set 5gmodem.btn_BTN_0.en_released='0'
+set 5gmodem.btn_BTN_0.ct_released='simple'
+set 5gmodem.btn_BTN_0.released='/usr/bin/mcu-switch pw off'
+set 5gmodem.btn_BTN_0.en_double='1'
+set 5gmodem.btn_BTN_0.ct_double='simple'
+set 5gmodem.btn_BTN_0.double='/usr/bin/mcu-switch sms'
+
+commit 5gmodem
+EOF
+
+/etc/init.d/5gmodem-mm-inhibit stop
+/etc/init.d/5gmodem-mm-inhibit disable
+
+exit 0

@@ -1,5 +1,5 @@
 #!/bin/sh
-# awg-control on|off: AmneziaWG full tunnel (on) or split routes only (off) for the LAN subnet
+# awg-control on_full|on_split|off: AmneziaWG full tunnel, split routes only, or back to split (ifdown if on_* brought it up)
 
 interface="$(uci -q get awg-control.main.interface)"
 vpn_zone="$(uci -q get awg-control.main.zone)"
@@ -11,8 +11,9 @@ list_dir=/etc/split-routes
 batch_file=/tmp/awg-control.routes
 state_file=/tmp/awg-control.state
 switch_file=/tmp/awg-control.switch
+ifup_file=/tmp/awg-control.ifup
 
-[ -n "$interface" ] || interface=awg0
+[ -n "$interface" ] || interface=awg
 [ -n "$vpn_zone" ] || vpn_zone=vpn
 [ -n "$lan_subnet" ] || lan_subnet=192.168.201.0/24
 [ -n "$lan_device" ] || lan_device=br-lan
@@ -88,6 +89,7 @@ remove_policy() {
 }
 
 load_lists() {
+	echo "in load_lists"
 	: >"$batch_file"
 
 	for list in "$list_dir"/*.lst; do
@@ -99,8 +101,19 @@ load_lists() {
 			}
 		' "$list" >>"$batch_file"
 	done
-
+	
+	echo "$batch_file:"
+	cat "$batch_file"
+	echo
+	
+	echo "route_table: $route_table"
+	echo
+	
+	echo "running ip -4 route flush table $route_table"
 	ip -4 route flush table "$route_table"
+	echo
+	
+	echo "running ip -4 -batch $batch_file"
 	ip -4 -batch "$batch_file" || {
 		log_error "failed to load routes from $list_dir"
 		return 1
@@ -124,7 +137,7 @@ apply_mode() {
 	if ! interface_is_up; then
 		remove_policy
 		mode=wan
-	elif [ "$switch_state" = "on" ]; then
+	elif [ "$switch_state" = on_full ]; then
 		validate_main_route || return 1
 		load_lists || return 1
 		ip -4 route replace default dev "$interface" table "$route_table"
@@ -140,9 +153,39 @@ apply_mode() {
 		"mode=$mode switch=$switch_state interface=$interface lan=$lan_subnet iif=$lan_device table=$route_table"
 }
 
-set_switch() {
+diag() {                          # log details after a failure: logread -e awg-control
+	local s r n
+	log_error "detail: switch=$(cat "$switch_file" 2>/dev/null) state=$(cat "$state_file" 2>/dev/null)" \
+		"$interface up=$(interface_is_up && echo yes || echo no)"
+	ip -4 route show table main default | while read -r r; do log_error "detail: main default: $r"; done
+	for s in $(uci -q show network | sed -n "s/^network\.\([^.=]*\)=amneziawg_$interface$/\1/p"); do
+		r=$(uci -q get "network.$s.route_allowed_ips") || r=0
+		log_error "detail: peer $s route_allowed_ips=$r allowed_ips=$(uci -q get "network.$s.allowed_ips")"
+		[ "$r" = 1 ] && log_error "detail: fix: uci set network.$s.route_allowed_ips=0; uci commit network; ifup $interface"
+	done
+	n=$(date +%s)
+	awg show "$interface" latest-handshakes 2>/dev/null | while read -r s r; do
+		[ "$r" -gt 0 ] 2>/dev/null && r="$((n - r))s ago" || r=never
+		log_error "detail: peer ${s%"${s#????????}"}... handshake $r"
+	done
+}
+
+set_switch() {                    # on_*: ifup if down, full/split; off: split, ifdown if on_* brought it up
+	local i=0
 	echo "$1" >"$switch_file"
-	apply_mode
+	if [ "$1" != off ] && ! interface_is_up; then
+		touch "$ifup_file"; ifup "$interface"
+		while ! interface_is_up && [ $i -lt 30 ]; do sleep 1; i=$((i + 1)); done
+		interface_is_up || log_error "$interface not up within 30 s"
+	fi
+	if apply_mode && { [ "$1" = off ] || [ "$(cat "$state_file")" = "${1#on_}" ]; }; then
+		[ "$1" != off ] || [ ! -f "$ifup_file" ] || { rm -f "$ifup_file"; ifdown "$interface"; }
+		return 0
+	fi
+	diag                              # failed: back to off, undo own ifup
+	echo off >"$switch_file"
+	[ ! -f "$ifup_file" ] || { rm -f "$ifup_file"; ifdown "$interface"; }
+	return 1
 }
 
 show_status() {
@@ -157,7 +200,7 @@ show_status() {
 	ip -4 route show table main default
 }
 
-case "$1" in on|off|init|reload|sync|wan) exec 9>/var/lock/awg-control.lock; flock 9 ;; esac
+case "$1" in on_full|on_split|off|init|reload|sync|wan) exec 9>/var/lock/awg-control.lock; flock 9 ;; esac
 
 case "$1" in
 	init)
@@ -166,10 +209,19 @@ case "$1" in
 		apply_mode
 		;;
 	reload|sync)
-		apply_mode
+		apply_mode || { diag; exit 1; }
 		;;
-	on|off)
+	on_full|on_split|off)
 		set_switch "$1"
+		;;
+	is)                               # is on_full|on_split|off: current state matches (mcu-switch "already")
+		s=$(cat "$state_file" 2>/dev/null)
+		case "$2" in
+			on_full)  [ "$s" = full ] ;;
+			on_split) [ "$s" = split ] ;;
+			off)      [ "$s" != full ] && [ ! -f "$ifup_file" ] ;;
+			*)        exit 2 ;;
+		esac
 		;;
 	wan)
 		remove_policy
@@ -180,7 +232,7 @@ case "$1" in
 		show_status
 		;;
 	*)
-		echo "usage: awg-control init|reload|sync|on|off|wan|status" >&2
+		echo "usage: awg-control init|reload|sync|on_full|on_split|off|is|wan|status" >&2
 		exit 2
 		;;
 esac

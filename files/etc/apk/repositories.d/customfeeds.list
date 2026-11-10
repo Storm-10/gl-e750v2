@@ -1,0 +1,5 @@
+https://downloads.openwrt.org/releases/25.12.6/targets/ath79/nand/kmods/6.12.112-1-59cfbc0272b0b8cdf438481b60598656/packages.adb
+
+# add your custom package feeds here
+#
+# http://www.example.com/path/to/files/packages.adb
