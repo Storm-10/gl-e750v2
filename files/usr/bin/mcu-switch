@@ -28,7 +28,7 @@ title() {                                                                     # 
    case "$CMD" in '') R1="No action set"; return ;; *mcu-switch\ *) ;; *) R1="Running..."; return ;; esac
    set -- ${CMD#*mcu-switch }                                                 # first call of a sequence
    case $1 in
-      sms) R1="SMS" ;; metrics|meters) [ "$K" = m ] && R1="Metrics off" || R1="Metrics" ;; standby) R1="Standby mode" ;;
+      sms) R1="Loading SMS..." ;; metrics|meters) [ "$K" = m ] && R1="Stopping Metrics" || R1="Starting Metrics" ;; standby) R1="Standby mode" ;;
       *) config_get n "$1" name "$1"; case $2 in on*) n="$n starting" ;; *) n="$n stopping" ;; esac
          rj $((15 - ${#n})) 0s; R1="$n $R" ;;
    esac
@@ -55,7 +55,7 @@ flip() {                                                                      # 
       exit 0
    fi
    now; T0=$UPC DL=$UPC
-   if [ "$OK" = s ] || [ "$OK" = m ]; then                                     # mode with input gets the flip at once
+   if [ "$OK" = s ] || [ "$OK" = m ]; then                                            # mode with input gets the flip at once
       echo "$$ $OK" > "$PEND"; log "flip $1 (SEEN ${2:-?}s)"; tomode flip
       tick "$GEST"; read -r p _ < "$PEND"; : > "$PEND"; [ "$p" = g ] || exit 0
       owner; [ "$OK" = s ] && { tomode double; exit 0; }
@@ -67,8 +67,8 @@ flip() {                                                                      # 
    if [ "$p" = g ]; then act double; elif [ "$p" = $$ ]; then act "$1"; fi
 }
 
-metrics() {                                    # toggle; screen 1: bandwidth, conns, load/CPU, mem; 2: signal (flip); MTO s
-   [ -n "${MCU_K+x}" ] || { owner; MCU_K=$OK; }                                 # CLI: toggle by current owner
+metrics() {                                                 # toggle; screen 1: bandwidth, conns, load/CPU, mem; 2: signal (flip); MTO s
+   [ -n "${MCU_K+x}" ] || { owner; MCU_K=$OK; }                            # CLI: toggle by current owner
    GOT= SC=1; trap 'GOT=1' USR1; own m
    [ "$MCU_K" = m ] && { log "metrics off"; send "Metrics off"; nap 2; clr; exit 0; }
    elapsed; END=$((UP + MTO)); log "metrics on for ${MTO}s"
@@ -82,20 +82,20 @@ metrics() {                                    # toggle; screen 1: bandwidth, co
    clr; log "metrics off: ${MTO}s timeout"
 }
 
-standby() {                                                                   # [on|off], default toggle; as mcu daemon power_saving_mode
+standby() {                                                                 # [on|off], default toggle; as mcu daemon power_saving_mode
    local w r
    case $1 in on) w=1 ;; off) w=0 ;; *) [ "$(uci -q get mcu.global.power_saveing)" = 1 ] && w=0 || w=1 ;; esac
    [ $w = 1 ] && r=ON || r=OFF
    own t; trap : TERM INT HUP; send "Standby mode $r"; log "standby $r"     # superseded: finish the switch-over
    for o in wireless.radio0.disabled wireless.radio1.disabled network.wan.disabled mcu.global.power_saveing; do uci set $o=$w; done
-   uci commit wireless; uci commit network; uci commit mcu; sync
+   uci commit wireless; uci commit network; uci commit mcu; sync; mcuref
    if [ $w = 1 ]; then ifdown wan; wifi down; else ifup wan; wifi up; fi
    nap 5; clr
 }
 
 case "$1" in
    flip)    case "$2" in on|off) flip "$2" "$3" ;; *) exit 2 ;; esac ;;
-   long)    owner; if [ "$OK" = s ]; then tomode long                        # MCU shows its own "Standby mode": overwrite at once
+   long)    mcuref & owner; if [ "$OK" = s ]; then tomode long              # MCU shows its own "Standby mode": overwrite at once
             else now; T0=$UPC; K=$OK; own f; getcmd long; title; send "$R1"; log "long press"; act long; fi ;;
    metrics|meters) metrics ;;
    standby) standby "$2" ;;

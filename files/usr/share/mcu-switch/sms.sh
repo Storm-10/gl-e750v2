@@ -19,7 +19,7 @@ s/№/N/g;s/$NB/ /g"
 if [ "$2" = new ]; then                                                       # notify once per new key
    [ -s $NEW ] || exit 0
    K=$(jq -r '.sms[].key' $NEW 2>/dev/null) || { err "sms: bad $NEW"; exit 1; }
-   F=; [ -z "$K" ] || { [ -s $NOTI ] && ! printf '%s\n' $K | grep -qvxF -f $NOTI; } || F=1   # a key not notified yet
+   F=; [ -z "$K" ] || { [ -s $NOTI ] && ! printf '%s\n' "$K" | grep -qvxF -f $NOTI; } || F=1   # a key not notified yet
    [ -n "$F" ] || { echo "$K" > $NOTI; exit 0; }
    [ "$FL$ON" != 00 ] || { echo "$K" > $NOTI; exit 0; }
    owner; case $OK in f|r|t|s) log "sms: new message, screen busy ($OK): retry next round"; exit 0 ;; esac
@@ -30,13 +30,14 @@ JP=; [ "$2" = new ] && [ "$ON" != 1 ] || {                                 # loa
    $SB unseen all,seen "$(uci -q get 5gmodem.sms.storage)" "$(uci -q get 5gmodem.sms.readport)" > $LST.j 2>/dev/null </dev/null & JP=$!; }
 input() { GOT=; A=; read -r A < "$IN" 2>/dev/null; : > "$IN"; g "mcu_$A" ""; ACT=$R
    [ -n "$ACT" ] || case $A in flip) ACT=page ;; double) ACT=read ;; long) ACT=exit ;; esac
-   log "sms: $A -> $ACT"; }
+   log "sms: $A -> $ACT"; [ "$ACT" = exit ] && send "SMS" "Exiting..."; }      # replaces MCU's own "Standby mode" at once
+bye() { nap 1; clr; log "sms: exit"; exit 0; }
 
-if [ "$2" = new ] && [ "$FL" = 1 ]; then         # flash "SMS" twice, 180 ms units; mcu_flash s if set; or until input
-   B=$(printf '\260\260\260\260\260\260\260\260\260\260\260\260\260\260\260\260')         # 0xB0: 2 thick bars, ~50% lit
-   case $FT in ''|*[!0-9]*) n=2 u=53 TT=954 ;;                                   # 23 units/word + 7 between words
+if [ "$2" = new ] && [ "$FL" = 1 ]; then         # flash display; mcu_flash s if set; or until input
+   B=$(printf '\260\260\260\260\260\260\260\260\260\260\260\260\260\260\260\260')   # 0xB0: 2 thick bars, ~50% lit
+   case $FT in ''|*[!0-9]*) n=2 u=53 TT=954 ;;                                      # 23 units/word + 7 between words
       *) n=$(((FT * 1000 / 167 + 7) / 30)); [ "$n" -gt 0 ] || n=1; u=$((30 * n - 7)) TT=$((FT * 100)) ;; esac
-   log "sms: flash $((TT / 100))s: SMS x$n, element $((TT * 10 / u)) ms"   # >= 167 ms: max 3 flashes/s (WCAG 2.3.1)
+   log "sms: flash $((TT / 100))s"               # >= 167 ms: max 3 flashes/s (WCAG 2.3.1)
    now; T=$UPC c=0
    while [ "$n" -gt 0 ] && [ -z "$GOT" ]; do
       o=1
@@ -48,7 +49,7 @@ if [ "$2" = new ] && [ "$FL" = 1 ]; then         # flash "SMS" twice, 180 ms uni
       done
       n=$((n - 1))
    done
-   [ -n "$GOT" ] && { input; [ "$ACT" = exit ] || [ "$ACT" = read ] && ON=0; }
+   [ -n "$GOT" ] && { input; [ "$ACT" = exit ] && bye; [ "$ACT" = read ] && ON=0; }
    [ "$ON" = 1 ] || { clr; exit 0; }
 fi
 
@@ -102,15 +103,15 @@ J=1 AUTO=1; now; E=$((UP + TO)); DL=$UPC; show
 while :; do
    tick "$W"; [ -n "$GOT" ] && { input; now; E=$((UP + TO)) DL=$UPC
       case $ACT in
-         page)   AUTO=0; if [ $((P + 3)) -ge "$LN" ]; then read1; J=$((J % NQ + 1)); show; else P=$((P + 4)); [ $((P + 3)) -gt "$LN" ] && P=$((LN - 3)); page; fi ;;
+         page)   AUTO=0; if [ $((P + 3)) -ge "$LN" ]; then J=$((J % NQ + 1)); show; else P=$((P + 4)); [ $((P + 3)) -gt "$LN" ] && P=$((LN - 3)); page; fi ;;
          next)   J=$((J % NQ + 1)); show ;;
          prev)   J=$(((J + NQ - 2) % NQ + 1)); show ;;
          replay) AUTO=1; show ;;
          read)   for i in $Q; do I=$i; read1; done; send "SMS" "All marked read"; nap 2; clr; exit 0 ;;
-         exit)   clr; log "sms: exit"; exit 0 ;;
+         exit)   bye ;;
       esac; continue; }
    [ "$UP" -ge "$E" ] && { clr; log "sms: ${TO}s timeout"; exit 0; }
    [ "$AUTO" = 1 ] || continue
    if [ $((P + 3)) -lt "$LN" ]; then P=$((P + 1)) W=1; page                  # scroll 1 line/s
-   else read1; [ "$LAST" = 1 ] || J=$((J % NQ + 1)); show; fi                # replay last or next
+   else [ "$LAST" = 1 ] || J=$((J % NQ + 1)); show; fi                       # replay last or next
 done

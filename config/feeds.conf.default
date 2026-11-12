@@ -3,8 +3,7 @@ src-git luci https://git.openwrt.org/project/luci.git^75a306df84a020c57a631ef5b4
 src-git routing https://git.openwrt.org/feed/routing.git^48c808034414a2112cf9d5261a20a320e8d0d170
 src-git telephony https://git.openwrt.org/feed/telephony.git^2618106d5846a4a542fdf5809f0d3ed228ce439b
 #src-git 5gmodem https://github.com/fildunsky/luci-app-5gmodem.git;v3.9.29
-src-git 5gmodem https://github.com/Storm-10/luci-app-5gmodem.git
-#src-git lpac https://github.com/fildunsky/lpac;v2.3.0-fm350-p9
+src-git 5gmodem https://github.com/Storm-10/luci-app-5gmodem.git;gl-e750-v2.0.2
 src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git^da712cf06cf4e6fd39e147fb36e6ec936003fcc9
 src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall2.git;26.11.3-1
 src-git podkop https://github.com/itdoginfo/podkop.git;0.7.24

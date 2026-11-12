@@ -15,9 +15,9 @@ case $LAN in */*) ;; ?*) LAN=$LAN/$(uci -q get network.lan.netmask) ;; esac   # 
 
 log() { logger -t mcu-switch "$*"; }
 err() { logger -t mcu-switch -p user.err "$*"; }
-now() { read -r UPC _ < /proc/uptime; UP=${UPC%.*}; UPC=$UP${UPC#*.}; }      # s and cs, no fork
-rj()  { R=$2; while [ ${#R} -lt "$1" ]; do R=" $R"; done; }                 # right-justify $2 to $1 -> R
-lj()  { R=$2; while [ ${#R} -lt "$1" ]; do R="$R "; done; }                 # left-justify
+now() { read -r UPC _ < /proc/uptime; UP=${UPC%.*}; UPC=$UP${UPC#*.}; }       # s and cs, no fork
+rj()  { R=$2; while [ ${#R} -lt "$1" ]; do R=" $R"; done; }                   # right-justify $2 to $1 -> R
+lj()  { R=$2; while [ ${#R} -lt "$1" ]; do R="$R "; done; }                   # left-justify
 nap() {                                                                       # sleep $1 s; returns at once on a trapped signal
    case $1 in                                                                 # OpenWrt busybox sleep: no fractions -> ucode
       *.*) set -- "${1#*.}000" "${1%.*}"; set -- "${1%"${1#???}"}" "$2"
@@ -91,30 +91,31 @@ $(awk -v cidr="$LAN" -v logs="$WATCH" -v offs="$OFF" -v done="$DONE" '
 EOT
 }
 
-rows() {                                                                      # R2..R4: conns, load/CPU, mem
+rows() {                                                       # R2..R4: conns, load/CPU, mem
    local c="$CPU%" k=$((${LD%.*} * 100 + 1${LD#*.} - 100)) l
    rj 11 "$LC/$TC"; R2="Conns$R"
    rj 3 "$c"; c=$R
    if [ ${#c} -eq 3 ] && [ "$k" -lt 995 ]; then k=$(((k + 5) / 10)); l=$((k / 10)).$((k % 10))
-   else l=$(((k + 50) / 100)); fi                                             # no decimal if CPU 100+% or load 10+
+   else l=$(((k + 50) / 100)); fi                              # no decimal if CPU 100+% or load 10+
    rj $((6 - ${#c})) "$l"; R3="Load $R CPU $c"
    rj 7 "$MEM"; R4="Mem avail$R"
 }
-
 mine() { [ -z "$ME" ] && return 0; read -r p _ 2>/dev/null < "$PID"; [ "$p" = "$ME" ] || { log "screen lost: exit"; exit 0; }; }
+
 send() {                                                                      # rows -> MCU pop-up (20 s or until next)
-   mine; printf "{\"msg\": \"%-16.16s%-16.16s%-16.16s%-16.16s\"}" "$@" > "$TTY" || [ -n "$WE" ] || { WE=1; err "cannot write $TTY"; }
+    mine; printf "{\"msg\": \"%-16.16s%-16.16s%-16.16s%-16.16s\"}" "$@" > "$TTY" || [ -n "$WE" ] || { WE=1; err "cannot write $TTY"; }
 }
-clr() { mine; printf '{"msg": " "}' > "$TTY"; }                                     # dismiss pop-up: standard screens return
+mcuref() { ubus -t 3 call mcu reload >/dev/null 2>&1; }      # daemon sends a status frame now: ends MCU's own "Standby mode" screen
+clr() { mine; printf '{"msg": " "}' > "$TTY"; mcuref; }                             # dismiss pop-up: standard screens return
 owner() { OP= OK=; [ -f "$PID" ] && read -r OP OK < "$PID"; [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null || OP= OK=; }
-own() {                                                                       # take the screen as kind $1: f flip, r module, m metrics, s SMS, t standby
+own() {                                                        # take the screen as kind $1: f flip, r module, m metrics, s SMS, t standby
    [ -n "$MCU_GEN" ] && { read -r p 2>/dev/null < "$GEN"; [ "$p" = "$MCU_GEN" ] || { log "$ARGS: superseded sequence: skipped"; exit 0; }; }
-   echo "${MCU_GEN:-$$}" > "$GEN"                                             # gesture sequence id: a later one skips our next calls
+   echo "${MCU_GEN:-$$}" > "$GEN"                              # gesture sequence id: a later one skips our next calls
    owner; echo "$$ $1" > "$PID"; ME=$$; [ -n "$OP" ] && [ "$OP" != $$ ] && kill "$OP" 2>/dev/null
    trap '[ -s "$PID" ] && read -r p _ < "$PID" && [ "$p" = $$ ] && : > "$PID"' EXIT
 }
 SIG=/tmp/mcu-switch.sig
-sig() {                                                     # $1 name, $2 value, $3..$4 scale (5gtop) -> R "RSRP-103 ###-"
+sig() {                                                        # $1 name, $2 value, $3..$4 scale (5gtop) -> R "RSRP-103 ###-"
    local v=${2#+} h b=
    v=${v%%.*}
    case $v in ''|-|*[!0-9-]*|?*-*) R="$1 --"; return ;; esac
@@ -123,7 +124,7 @@ sig() {                                                     # $1 name, $2 value,
    [ ${#v} -ge 4 ] || { lj 4 " $v"; v=$R; }
    R="$1$v $b"
 }
-signal() {                                                  # R1..R4: RSRP RSRQ SINR RSSI from 5gmodem, as 5gtop
+signal() {                                                     # R1..R4: RSRP RSRQ SINR RSSI from 5gmodem, as 5gtop
    local P= Q= S= I= n
    [ -x /usr/share/5gmodem/5gmodem.sh ] && { [ -n "$FP" ] && kill -0 "$FP" 2>/dev/null || {
       read -r _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ n _ < /proc/$$/stat          # poll at normal priority

@@ -15,6 +15,7 @@ local dev
 local baudrate
 local read_lock_flag = 0
 local mcu_status_flag = 0
+local force_frames = 0        -- status frames to send even if unchanged: MCU resyncs ps after its own long press
 --发送某些信息时加锁，进行reboot、firstboot、update等操作时禁止再次发送信息，避免错误显示
 local send_msg_lock_flag = 0
 local send_msg_unlock_count = 0
@@ -176,6 +177,7 @@ end
 
 -- power button held 3 s: mcu-switch runs the configured action (default: standby toggle)
 local function long_press(on)
+    force_frames = 5   -- ~25 s: outlasts a 20 s pop-up of an external command
     local f = io.open("/usr/bin/mcu-switch")
     if f then
         f:close()
@@ -329,7 +331,7 @@ local function get_serial_data(dev, baudrate, data)
     --先读取串口的数据，看单片机是否发送消息过来
     local tmp_data, result
     if read_lock_flag == 0 then
-        tmp_data = read_fun(fd, 1)  -- quick drain: buffered unsolicited messages
+        tmp_data = read_fun(fd, data and 1 or 0.3)  -- quick drain: buffered unsolicited messages
     end
 
     if tmp_data then
@@ -337,9 +339,10 @@ local function get_serial_data(dev, baudrate, data)
         result_hander(tmp_data)
     end
 
-    if data ~= last_msg or flag ~= 3 or mcu_status_flag == 1 then
+    if data and (data ~= last_msg or flag ~= 3 or mcu_status_flag == 1 or force_frames > 0) then
         print("send msg ======", data)
         mcu_status_flag = 0
+        if force_frames > 0 then force_frames = force_frames - 1 end
         fd:write(data)
 
         local err
@@ -582,7 +585,8 @@ local function get_modem_info(out)
 
     local wan_st = ubus.call("network.interface.wan", "status", {})
     out.modem_up = (wan_st and wan_st.up) and "1" or "0"
-    local sj = file.readfile("/tmp/5gmodem/sms_new.json") -- luci-app-5gmodem; > 0: SMS icon
+    -- luci-app-5gmodem: SMS icon as the LuCI status page one, 5gmodem.sms.ontopsms; > 0 new messages
+    local sj = uci.cursor():get("5gmodem", "sms", "ontopsms") == "1" and file.readfile("/tmp/5gmodem/sms_new.json")
     out.sms = sj and sj:match('^{"count":(%d+)') or "0"
 end
 
@@ -1863,7 +1867,13 @@ if oled_flag then
 
             collectgarbage("collect")
 
-            time.sleep(5)
+            -- 5 s between status frames; meanwhile pick up MCU button events (Power_Saving_on/off) within ~1 s
+            for _ = 1, 10 do
+                time.sleep(0.5)
+                if read_lock_flag == 0 and send_msg_lock_flag == 0 and product_test_flag ~= 1 then
+                    get_serial_data(dev, baudrate)
+                end
+            end
         end
     end)
 else
