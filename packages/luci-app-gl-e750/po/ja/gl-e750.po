@@ -1,0 +1,104 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Output new message(s) to GL-E750 display"
+msgstr "新着メッセージを GL-E750 のディスプレイに表示"
+
+msgid "Display is limited to Latin alphabet only. Translit will be used for Cyrillic symbols. E.g. Bud'te schastlivy!"
+msgstr "ディスプレイはラテン文字のみ対応です。キリル文字は翻字して表示されます。例: Bud'te schastlivy!"
+
+msgid "Show only the last message"
+msgstr "最新のメッセージのみ表示"
+
+msgid "When off all unread SMS will be displayed cycling in the order of time received starting with the most recent."
+msgstr "オフの場合、未読 SMS をすべて受信時刻順に最新のものから繰り返し表示します。"
+
+msgid "Time to display messages, seconds"
+msgstr "メッセージの表示時間 (秒)"
+
+msgid "Timer restarts on input. Configure actions in 'Buttons'."
+msgstr "入力があるとタイマーはリセットされます。動作は「ボタン」で設定します。"
+
+msgid "Flash GL-E750 display"
+msgstr "GL-E750 のディスプレイを点滅"
+
+msgid "AmneziaWG full tunnel"
+msgstr "AmneziaWG: フルトンネル"
+
+msgid "Sets AmneziaWG to full tunnel: configured interface started if down, all remote traffic routed via AmneziaWG."
+msgstr "AmneziaWG をフルトンネルにします: 設定済みのインターフェースが停止していれば起動し、外部へのすべての通信を AmneziaWG 経由にします。"
+
+msgid "AmneziaWG split tunnel"
+msgstr "AmneziaWG: スプリットトンネル"
+
+msgid "Sets AmneziaWG to split tunnel: configured interface started if down, only traffic to subnets listed in /etc/split-routes/*.lst files routed via AmneziaWG."
+msgstr "AmneziaWG をスプリットトンネルにします: 設定済みのインターフェースが停止していれば起動し、/etc/split-routes/*.lst ファイルに記載したサブネット宛ての通信だけを AmneziaWG 経由にします。"
+
+msgid "Stop AmneziaWG"
+msgstr "AmneziaWG を停止"
+
+msgid "Start Passwall2"
+msgstr "Passwall2 を開始"
+
+msgid "Stop Passwall2"
+msgstr "Passwall2 を停止"
+
+msgid "Show SMS"
+msgstr "SMS を表示"
+
+msgid "Show SMS on GL-E750 display. Additional settings in \"Inbox\""
+msgstr "GL-E750 のディスプレイに SMS を表示します。追加設定は「受信箱」にあります"
+
+msgid "Toggle Standby mode"
+msgstr "スタンバイモードを切り替え"
+
+msgid "Toggle Metrics"
+msgstr "メトリクス表示を切り替え"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exits automatically after 10 min."
+msgstr "GL-E750 のディスプレイにシステムメトリクスを表示します: WAN インターフェースの帯域幅、接続数、負荷、CPU 使用率、空きメモリ。2 画面目: 信号の RSRP、RSRQ、SINR、RSSI。画面はスイッチの切り替えで変わります。10 分後に自動的に終了します。"
+
+msgid "Enable action"
+msgstr "動作を有効化"
+
+msgid "Long press"
+msgstr "長押し"
+
+msgid "Hold right button for 3 s."
+msgstr "右ボタンを 3 秒間押し続けます。"
+
+msgid "Double flip"
+msgstr "スイッチ往復"
+
+msgid "Flip switch and back to original position within 2 s."
+msgstr "2 秒以内にスイッチを切り替えて元の位置に戻します。"
+
+msgid "Next page"
+msgstr "次のページ"
+
+msgid "Next message"
+msgstr "次のメッセージ"
+
+msgid "Previous message"
+msgstr "前のメッセージ"
+
+msgid "Replay message"
+msgstr "メッセージを再表示"
+
+msgid "Mark all read and exit"
+msgstr "すべて既読にして終了"
+
+msgid "Exit"
+msgstr "終了"
+
+msgid "Switch flip"
+msgstr "スイッチ切り替え"
+
+msgid "Show SMS mode"
+msgstr "SMS 表示モード"
+
+msgid "This mode also activates if configured in 'Inbox'. Button actions below apply only to this mode."
+msgstr "このモードは「受信箱」で設定した場合にも有効になります。下のボタン動作はこのモードでのみ適用されます。"
+
+msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
+msgstr "状態の概要ページと GL-E750 のディスプレイに新着メッセージの通知アイコンを表示する"

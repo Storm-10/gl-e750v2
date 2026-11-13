@@ -273,7 +273,7 @@ collect_release_assets() {
   local src="${SRC_DIR_ABS}/bin/targets/${OPENWRT_TARGET}/${OPENWRT_SUBTARGET}"
   local old="openwrt-${OPENWRT_TARGET}-${OPENWRT_SUBTARGET}-${OPENWRT_PROFILE}"
   local new="openwrt-gl-e750-${RELEASE_VERSION}"
-  local out="${ROOT_DIR}/release" f
+  local out="${WORKDIR_ABS}/release" f
   rm -rf "${out}" && mkdir -p "${out}"
   for f in "${src}/${old}"*; do cp "${f}" "${out}/${new}${f##*/${old}}"; done
   (cd "${out}" && sha256sum -- * > sha256sums)

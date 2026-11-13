@@ -1,6 +1,7 @@
 # /usr/share/mcu-switch/lib.sh — shared by /usr/bin/mcu-switch and its modules (sourced, busybox ash)
 # Screen: 'msg' frames (4x16) written straight to the MCU tty, 20 s pop-up or until the next frame.
 PID=/tmp/mcu-switch.pid PEND=/tmp/mcu-switch.pend IN=/tmp/mcu-switch.in GEN=/tmp/mcu-switch.gen ARGS="$*"
+LP=/tmp/mcu-switch.long BOOT=/tmp/mcu-switch.boot
 . /lib/functions.sh
 config_load mcu
 config_get REFRESH switch refresh 2
@@ -105,8 +106,11 @@ mine() { [ -z "$ME" ] && return 0; read -r p _ 2>/dev/null < "$PID"; [ "$p" = "$
 send() {                                                                      # rows -> MCU pop-up (20 s or until next)
     mine; printf "{\"msg\": \"%-16.16s%-16.16s%-16.16s%-16.16s\"}" "$@" > "$TTY" || [ -n "$WE" ] || { WE=1; err "cannot write $TTY"; }
 }
-mcuref() { ubus -t 3 call mcu reload >/dev/null 2>&1; }      # daemon sends a status frame now: ends MCU's own "Standby mode" screen
-clr() { mine; printf '{"msg": " "}' > "$TTY"; mcuref; }                             # dismiss pop-up: standard screens return
+mcuref() { ubus -t 3 call mcu reload >/dev/null 2>&1; }      # daemon sends a status frame now (1-3 s): ends MCU's own "Standby mode" screen
+clr() {                                                       # dismiss pop-up: standard screens return
+   mine; printf '{"msg": " "}' > "$TTY"
+   [ -e "$LP" ] && { rm -f "$LP"; mcuref; }                   # only after a long press: MCU switched its first screen itself
+}
 owner() { OP= OK=; [ -f "$PID" ] && read -r OP OK < "$PID"; [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null || OP= OK=; }
 own() {                                                        # take the screen as kind $1: f flip, r module, m metrics, s SMS, t standby
    [ -n "$MCU_GEN" ] && { read -r p 2>/dev/null < "$GEN"; [ "$p" = "$MCU_GEN" ] || { log "$ARGS: superseded sequence: skipped"; exit 0; }; }

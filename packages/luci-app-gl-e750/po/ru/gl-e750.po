@@ -1,0 +1,104 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Output new message(s) to GL-E750 display"
+msgstr "Вывод новых SMS на дисплей GL-E750"
+
+msgid "Display is limited to Latin alphabet only. Translit will be used for Cyrillic symbols. E.g. Bud'te schastlivy!"
+msgstr "Дисплей поддерживает только латиницу. Кириллица выводится транслитом, например: Bud'te schastlivy!"
+
+msgid "Show only the last message"
+msgstr "Показывать только последнее сообщение"
+
+msgid "When off all unread SMS will be displayed cycling in the order of time received starting with the most recent."
+msgstr "Если выключено, все непрочитанные SMS показываются по кругу в порядке получения, начиная с самого нового."
+
+msgid "Time to display messages, seconds"
+msgstr "Время показа сообщений, секунд"
+
+msgid "Timer restarts on input. Configure actions in 'Buttons'."
+msgstr "Таймер перезапускается при вводе. Действия настраиваются в разделе «Кнопки»."
+
+msgid "Flash GL-E750 display"
+msgstr "Мигать дисплеем GL-E750"
+
+msgid "AmneziaWG full tunnel"
+msgstr "AmneziaWG: полный туннель"
+
+msgid "Sets AmneziaWG to full tunnel: configured interface started if down, all remote traffic routed via AmneziaWG."
+msgstr "Переводит AmneziaWG в режим полного туннеля: настроенный интерфейс запускается, если он остановлен, весь внешний трафик идёт через AmneziaWG."
+
+msgid "AmneziaWG split tunnel"
+msgstr "AmneziaWG раздельный туннель"
+
+msgid "Sets AmneziaWG to split tunnel: configured interface started if down, only traffic to subnets listed in /etc/split-routes/*.lst files routed via AmneziaWG."
+msgstr "Переводит AmneziaWG в режим раздельного туннеля: настроенный интерфейс запускается, если он остановлен, через AmneziaWG идёт только трафик к подсетям из списков /etc/split-routes/*.lst."
+
+msgid "Stop AmneziaWG"
+msgstr "Остановить AmneziaWG"
+
+msgid "Start Passwall2"
+msgstr "Запустить Passwall2"
+
+msgid "Stop Passwall2"
+msgstr "Остановить Passwall2"
+
+msgid "Show SMS"
+msgstr "Показать SMS"
+
+msgid "Show SMS on GL-E750 display. Additional settings in \"Inbox\""
+msgstr "Вывод SMS на дисплей GL-E750. Дополнительные настройки - во «Входящих»"
+
+msgid "Toggle Standby mode"
+msgstr "Переключить режим ожидания"
+
+msgid "Toggle Metrics"
+msgstr "Переключить метрики"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exits automatically after 10 min."
+msgstr "Вывод системных метрик на дисплей GL-E750: скорость через WAN-интерфейс, число соединений, нагрузка, загрузка CPU, доступная память. Второй экран: RSRP, RSRQ, SINR, RSSI сигнала. Смена экранов переключателем. Автоматический выход из режима через 10 мин."
+
+msgid "Enable action"
+msgstr "Включить действие"
+
+msgid "Long press"
+msgstr "Долгое нажатие"
+
+msgid "Hold right button for 3 s."
+msgstr "Удерживайте правую кнопку 3 с."
+
+msgid "Double flip"
+msgstr "Двойное переключение"
+
+msgid "Flip switch and back to original position within 2 s."
+msgstr "Переключить и вернуть в исходное положение в течение 2 с"
+
+msgid "Next page"
+msgstr "Следующая страница"
+
+msgid "Next message"
+msgstr "Следующее сообщение"
+
+msgid "Previous message"
+msgstr "Предыдущее сообщение"
+
+msgid "Replay message"
+msgstr "Показать сообщение заново"
+
+msgid "Mark all read and exit"
+msgstr "Отметить все прочитанными и выйти"
+
+msgid "Exit"
+msgstr "Выход"
+
+msgid "Switch flip"
+msgstr "Переключение"
+
+msgid "Show SMS mode"
+msgstr "Режим показа SMS"
+
+msgid "This mode also activates if configured in 'Inbox'. Button actions below apply only to this mode."
+msgstr "Этот режим также включается, если это настроен во «Входящие». Действия кнопок ниже работают только в этом режиме."
+
+msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
+msgstr "Показывать значок уведомления о новом сообщении на странице обзора состояния и на дисплее GL-E750"

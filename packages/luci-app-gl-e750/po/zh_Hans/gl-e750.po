@@ -1,0 +1,104 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Output new message(s) to GL-E750 display"
+msgstr "在 GL-E750 显示屏上显示新消息"
+
+msgid "Display is limited to Latin alphabet only. Translit will be used for Cyrillic symbols. E.g. Bud'te schastlivy!"
+msgstr "显示屏仅支持拉丁字母。西里尔字母将以转写形式显示。例如：Bud'te schastlivy!"
+
+msgid "Show only the last message"
+msgstr "仅显示最新一条消息"
+
+msgid "When off all unread SMS will be displayed cycling in the order of time received starting with the most recent."
+msgstr "关闭时，所有未读短信将按接收时间顺序从最新一条开始循环显示。"
+
+msgid "Time to display messages, seconds"
+msgstr "消息显示时间（秒）"
+
+msgid "Timer restarts on input. Configure actions in 'Buttons'."
+msgstr "有输入时计时器重新开始。在“按键”中配置操作。"
+
+msgid "Flash GL-E750 display"
+msgstr "闪烁 GL-E750 显示屏"
+
+msgid "AmneziaWG full tunnel"
+msgstr "AmneziaWG：全局隧道"
+
+msgid "Sets AmneziaWG to full tunnel: configured interface started if down, all remote traffic routed via AmneziaWG."
+msgstr "将 AmneziaWG 设为全局隧道：已配置的接口若未运行则启动，所有外部流量经 AmneziaWG 路由。"
+
+msgid "AmneziaWG split tunnel"
+msgstr "AmneziaWG：分流隧道"
+
+msgid "Sets AmneziaWG to split tunnel: configured interface started if down, only traffic to subnets listed in /etc/split-routes/*.lst files routed via AmneziaWG."
+msgstr "将 AmneziaWG 设为分流隧道：已配置的接口若未运行则启动，仅发往 /etc/split-routes/*.lst 文件中所列子网的流量经 AmneziaWG 路由。"
+
+msgid "Stop AmneziaWG"
+msgstr "停止 AmneziaWG"
+
+msgid "Start Passwall2"
+msgstr "启动 Passwall2"
+
+msgid "Stop Passwall2"
+msgstr "停止 Passwall2"
+
+msgid "Show SMS"
+msgstr "显示短信"
+
+msgid "Show SMS on GL-E750 display. Additional settings in \"Inbox\""
+msgstr "在 GL-E750 显示屏上显示短信。更多设置见“收件箱”"
+
+msgid "Toggle Standby mode"
+msgstr "切换待机模式"
+
+msgid "Toggle Metrics"
+msgstr "切换指标显示"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exits automatically after 10 min."
+msgstr "在 GL-E750 显示屏上显示系统指标：WAN 接口带宽、连接数、负载、CPU 使用率、可用内存。第二屏：信号的 RSRP、RSRQ、SINR、RSSI。拨动开关切换屏幕。10 分钟后自动退出。"
+
+msgid "Enable action"
+msgstr "启用操作"
+
+msgid "Long press"
+msgstr "长按"
+
+msgid "Hold right button for 3 s."
+msgstr "按住右侧按键 3 秒。"
+
+msgid "Double flip"
+msgstr "双拨"
+
+msgid "Flip switch and back to original position within 2 s."
+msgstr "在 2 秒内拨动开关并拨回原位。"
+
+msgid "Next page"
+msgstr "下一页"
+
+msgid "Next message"
+msgstr "下一条消息"
+
+msgid "Previous message"
+msgstr "上一条消息"
+
+msgid "Replay message"
+msgstr "重新显示消息"
+
+msgid "Mark all read and exit"
+msgstr "全部标记为已读并退出"
+
+msgid "Exit"
+msgstr "退出"
+
+msgid "Switch flip"
+msgstr "拨动开关"
+
+msgid "Show SMS mode"
+msgstr "短信显示模式"
+
+msgid "This mode also activates if configured in 'Inbox'. Button actions below apply only to this mode."
+msgstr "如果在“收件箱”中进行了配置，此模式也会启用。下方的按键操作仅适用于此模式。"
+
+msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
+msgstr "在状态概览页和 GL-E750 显示屏显示新消息通知图标"

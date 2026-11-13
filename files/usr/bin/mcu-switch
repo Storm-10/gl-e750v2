@@ -3,32 +3,47 @@
 #   flip on|off [SEEN]   /etc/rc.button/BTN_0; flip and back within 'gesture' s = double flip
 #   long                 mcu daemon, power button held 3 s (MCU 'Power_Saving_on/off')
 #   metrics | standby [on|off] | sms [new] | <module> on|on_*|off     actions; module = 'module' section in /etc/config/mcu
+#   boot                 mcu daemon start; once per boot: leave standby, idle disabled radios
 # One screen mode at a time: a gesture or a new mode ends the current one; SMS and metrics modes take flips as input.
 # Actions: luci-app-5gmodem "Buttons" (btn_BTN_0 pressed/released/double, btn_power pressed) if configured there,
-# else /etc/config/mcu switch.cmd_on/cmd_off/cmd_double/cmd_long.
+# else /etc/config/mcu switch.cmd_on/cmd_off/cmd_double/cmd_long (kept equal to "Buttons" by mirror).
 [ -n "$MCU_NICE" ] || ! nice -n -10 true 2>/dev/null || MCU_NICE=1 exec nice -n -10 "$0" "$@"   # keep pace under load
 . /usr/share/mcu-switch/lib.sh
 B5=/usr/share/5gmodem/buttons.sh
 
-getcmd() {                                                                    # $1 on|off|double|long -> CMD, RUN; OFF=1: disabled
+getcmd() {                                                                    # $1 on|off|double|long -> CMD, RUN, G; OFF=1: disabled; S5=1: from 5gmodem
    local b=BTN_0 s=$1 e=1 d=
    case $1 in
-      on) s=pressed e=0 ;; off) s=released e=0 ;;
-      double) d="/usr/bin/mcu-switch sms" ;; long) b=power s=pressed d="/usr/bin/mcu-switch standby" ;;
+      on) s=pressed e=0 G="Switch ON" ;; off) s=released e=0 G="Switch OFF" ;;
+      double) d="/usr/bin/mcu-switch sms" G="Double flip" ;; long) b=power s=pressed d="/usr/bin/mcu-switch standby" G="Long press" ;;
    esac
-   OFF=
+   OFF= S5=
    if [ -x $B5 ] && uci -q get 5gmodem.btn_$b >/dev/null; then              # defaults as LuCI "Buttons"
-      RUN="$B5 run $b $s ${SEEN:-0}"; CMD=$(uci -q get 5gmodem.btn_$b.$s) || { CMD=$d; RUN='sh -c "$CMD"'; }
+      S5=1 RUN="$B5 run $b $s ${SEEN:-0}"; CMD=$(uci -q get 5gmodem.btn_$b.$s) || { CMD=$d; RUN='sh -c "$CMD"'; }
       [ "$b" = power ] || [ "$(uci -q get 5gmodem.btn_$b.en_$s || echo $e)" = 1 ] || { OFF=1 CMD=; }
    else config_get CMD switch "cmd_$1"; RUN='sh -c "$CMD"'; fi
 }
 
-title() {                                                                     # CMD -> R1: instant first line
+mirror() {                                                                    # "Buttons" actions -> mcu.switch.cmd_*: same gestures if 5gmodem is removed
+   local g c m=
+   for g in on off double long; do
+      getcmd $g; [ -n "$S5" ] || continue
+      config_get c switch "cmd_$g"; [ "$c" = "$CMD" ] && continue
+      uci -q set "mcu.switch.cmd_$g=$CMD"; m=1; log "mirror: cmd_$g='$CMD'"
+   done
+   [ -z "$m" ] || uci -q commit mcu
+}
+
+sbw() { case $1 in on) W=1 ;; off) W=0 ;; *) [ "$(uci -q get mcu.global.power_saveing)" = 1 ] && W=0 || W=1 ;; esac; }   # standby target -> W
+
+title() {                                                                     # CMD, G -> R1 mode name as the mode shows it, R2 status: row 1 does not flicker
    local n
-   case "$CMD" in '') R1="No action set"; return ;; *mcu-switch\ *) ;; *) R1="Running..."; return ;; esac
+   R2=
+   case "$CMD" in '') R1=$G R2="No action set"; return ;; *mcu-switch\ *) ;; *) R1=$G R2="Running..."; return ;; esac
    set -- ${CMD#*mcu-switch }                                                 # first call of a sequence
    case $1 in
-      sms) R1="Loading SMS..." ;; metrics|meters) [ "$K" = m ] && R1="Stopping Metrics" || R1="Starting Metrics" ;; standby) R1="Standby mode" ;;
+      sms) R1=SMS R2="Loading..." ;; metrics|meters) R1=Metrics; [ "$K" = m ] && R2=Off || R2="Starting..." ;;
+      standby) sbw "$2"; R1="Standby mode"; [ $W = 1 ] && R2=ON || R2=OFF ;;
       *) config_get n "$1" name "$1"; case $2 in on*) n="$n starting" ;; *) n="$n stopping" ;; esac
          rj $((15 - ${#n})) 0s; R1="$n $R" ;;
    esac
@@ -51,7 +66,7 @@ flip() {                                                                      # 
    owner; p= k=; [ -f "$PEND" ] && read -r p k < "$PEND"
    if [ "${2:-0}" -lt "$GEST" ] && [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then    # flip back in time
       echo "g $k" > "$PEND"; log "flip $1 (SEEN ${2:-?}s): double flip"
-      case $k in s|m) ;; *) getcmd double; [ -n "$OFF" ] || { title; send "$R1"; } ;; esac
+      case $k in s|m) ;; *) getcmd double; [ -n "$OFF" ] || { title; send "$R1" "$R2"; } ;; esac
       exit 0
    fi
    now; T0=$UPC DL=$UPC
@@ -59,10 +74,10 @@ flip() {                                                                      # 
       echo "$$ $OK" > "$PEND"; log "flip $1 (SEEN ${2:-?}s)"; tomode flip
       tick "$GEST"; read -r p _ < "$PEND"; : > "$PEND"; [ "$p" = g ] || exit 0
       owner; [ "$OK" = s ] && { tomode double; exit 0; }
-      K=$OK; own f; getcmd double; [ -n "$OFF" ] || { title; send "$R1"; }; act double; exit 0   # metrics: ends, action runs
+      K=$OK; own f; getcmd double; [ -n "$OFF" ] || { title; send "$R1" "$R2"; }; act double; exit 0   # metrics: ends, action runs
    fi
    K=$OK; own f; echo "$$ $K" > "$PEND"
-   getcmd "$1"; [ -n "$OFF" ] || { title; send "$R1"; }; log "flip $1 (SEEN ${2:-?}s)"
+   getcmd "$1"; [ -n "$OFF" ] || { title; send "$R1" "$R2"; }; log "flip $1 (SEEN ${2:-?}s)"; ( mirror )
    tick "$GEST"; read -r p _ < "$PEND"; : > "$PEND"
    if [ "$p" = g ]; then act double; elif [ "$p" = $$ ]; then act "$1"; fi
 }
@@ -70,7 +85,7 @@ flip() {                                                                      # 
 metrics() {                                                 # toggle; screen 1: bandwidth, conns, load/CPU, mem; 2: signal (flip); MTO s
    [ -n "${MCU_K+x}" ] || { owner; MCU_K=$OK; }                            # CLI: toggle by current owner
    GOT= SC=1; trap 'GOT=1' USR1; own m
-   [ "$MCU_K" = m ] && { log "metrics off"; send "Metrics off"; nap 2; clr; exit 0; }
+   [ "$MCU_K" = m ] && { log "metrics off"; send "Metrics" "Off"; nap 2; clr; exit 0; }
    elapsed; END=$((UP + MTO)); log "metrics on for ${MTO}s"
    trap 'log "metrics off: superseded"; exit 0' TERM INT HUP
    sample; tick 1; sample
@@ -82,24 +97,70 @@ metrics() {                                                 # toggle; screen 1: 
    clr; log "metrics off: ${MTO}s timeout"
 }
 
-standby() {                                                                 # [on|off], default toggle; as mcu daemon power_saving_mode
-   local w r
-   case $1 in on) w=1 ;; off) w=0 ;; *) [ "$(uci -q get mcu.global.power_saveing)" = 1 ] && w=0 || w=1 ;; esac
-   [ $w = 1 ] && r=ON || r=OFF
-   own t; trap : TERM INT HUP; send "Standby mode $r"; log "standby $r"     # superseded: finish the switch-over
-   for o in wireless.radio0.disabled wireless.radio1.disabled network.wan.disabled mcu.global.power_saveing; do uci set $o=$w; done
-   uci commit wireless; uci commit network; uci commit mcu; sync; mcuref
-   if [ $w = 1 ]; then ifdown wan; wifi down; else ifup wan; wifi up; fi
+SBY="wireless.radio0 wireless.radio1 network.wan"                           # switched off in standby
+standby() {                                                                 # [on|off], default toggle
+   local r o l=                                                             # mcu.global.standby_restore: what to switch back on
+   sbw "$1"; [ $W = 1 ] && r=ON || r=OFF
+   own t; trap : TERM INT HUP; send "Standby mode" "$r"; log "standby $r"   # superseded: finish the switch-over
+   if [ "$(uci -q get mcu.global.power_saveing || echo 0)" = $W ]; then log "standby: already $r"; nap 3; clr; return 0; fi
+   if [ $W = 1 ]; then
+      for o in $SBY; do
+         uci -q get $o >/dev/null && [ "$(uci -q get $o.disabled)" != 1 ] || continue
+         l="$l $o"; uci set $o.disabled=1
+      done
+      l=${l# }; uci set mcu.global.standby_restore="${l:-none}"
+   else
+      l=$(uci -q get mcu.global.standby_restore) || l=$SBY                  # entered by older code: all
+      for o in $l; do [ "$o" = none ] || uci -q set $o.disabled=0; done
+      uci -q delete mcu.global.standby_restore
+   fi
+   uci set mcu.global.power_saveing=$W
+   uci commit mcu; uci commit wireless; uci commit network; sync; mcuref
+   if [ $W = 1 ]; then
+      [ -d /tmp/5gmodem ] && : > /tmp/5gmodem/standby                       # luci-app-5gmodem: watchdog and network jobs pause
+      ifdown wan; wifi down
+   else
+      case " $l " in *" network.wan "*) ifup wan ;; esac                    # ifup, wifi up: netifd reloads the config first
+      case $l in *wireless.*) wifi up ;; esac
+      rm -f /tmp/5gmodem/standby
+   fi
    nap 5; clr
+}
+
+phy() {                                                                     # wifi-device $1 -> R phy name
+   local p
+   R=$(iwinfo nl80211 phyname "$1" 2>/dev/null); [ -n "$R" ] && [ -d "/sys/class/ieee80211/$R" ] && return 0
+   p=$(uci -q get "wireless.$1.path") || return 1
+   for R in /sys/class/ieee80211/*; do
+      case "$(readlink -f "$R/device" 2>/dev/null)" in */"$p") R=${R##*/}; return 0 ;; esac
+   done
+   return 1
+}
+
+idle() {                                    # disabled radio: chip stays powered after boot until started and stopped once
+   local d n
+   for d in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
+      [ "$(uci -q get "wireless.$d.disabled")" = 1 ] && phy "$d" || continue
+      [ -z "$(ls "/sys/class/ieee80211/$R/device/net" 2>/dev/null)" ] || continue
+      n=idle${R#phy}
+      if iw phy "$R" interface add "$n" type managed 2>/dev/null; then
+         ip link set "$n" up 2>/dev/null && { nap 2; ip link set "$n" down; log "idle: $d ($R) started and stopped"; } \
+            || err "idle: $d ($R): cannot start"
+         iw dev "$n" del 2>/dev/null
+      else err "idle: $d ($R): cannot add interface"; fi
+   done
 }
 
 case "$1" in
    flip)    case "$2" in on|off) flip "$2" "$3" ;; *) exit 2 ;; esac ;;
-   long)    mcuref & owner; if [ "$OK" = s ]; then tomode long              # MCU shows its own "Standby mode": overwrite at once
-            else now; T0=$UPC; K=$OK; own f; getcmd long; title; send "$R1"; log "long press"; act long; fi ;;
+   long)    : > "$LP"; mcuref & owner; if [ "$OK" = s ]; then tomode long   # MCU shows its own "Standby mode": overwrite at once
+            else now; T0=$UPC; K=$OK; own f; getcmd long; title; send "$R1" "$R2"; log "long press"; ( mirror ); act long; fi ;;
+   boot)    [ -e "$BOOT" ] && exit 0; : > "$BOOT"                           # daemon restart: standby stays
+            [ "$(uci -q get mcu.global.power_saveing)" = 1 ] && { log "boot: leaving standby"; ( standby off ); }
+            idle ;;
    metrics|meters) metrics ;;
    standby) standby "$2" ;;
    sms)     . /usr/share/mcu-switch/sms.sh ;;
    *)       if [ -n "$1" ] && [ "$(uci -q get "mcu.$1")" = module ]; then . /usr/share/mcu-switch/module.sh
-            else echo "usage: $0 flip on|off [SEEN] | long | metrics | standby [on|off] | sms [new] | <module> on|on_*|off" >&2; exit 2; fi ;;
+            else echo "usage: $0 flip on|off [SEEN] | long | boot | metrics | standby [on|off] | sms [new] | <module> on|on_*|off" >&2; exit 2; fi ;;
 esac

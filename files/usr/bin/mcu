@@ -133,58 +133,15 @@ local function system_shutdown()
     os.execute("/etc/init.d/umount stop")
 end
 
---判断是否处于待机模式,将其关闭
+-- once per boot mcu-switch leaves standby and idles disabled radios; a daemon restart keeps standby
 local function clear_power_saving()
-    local c = uci.cursor()
-    local standby = c:get("mcu", "global", "power_saveing")
-    c:close()
-    if standby == "1" then
-        os.execute("uci set wireless.radio0.disabled=0")
-        os.execute("uci set wireless.radio1.disabled=0")
-        os.execute("uci set network.wan.disabled=0")
-        os.execute("uci set mcu.global.power_saveing=0")
-        os.execute("uci commit wireless && uci commit network && uci commit mcu")
-        file.sync()
-        os.execute("ifup wan")
-        os.execute("wifi up")
-    end
-end
-
-local function power_saving_mode(on)
-    if on then
-        print("Power saving ON\n")
-        os.execute("uci set wireless.radio0.disabled=1")
-        os.execute("uci set wireless.radio1.disabled=1")
-        os.execute("uci set network.wan.disabled=1")
-        os.execute("uci set mcu.global.power_saveing=1")
-    else
-        print("Power saving OFF\n")
-        os.execute("uci set wireless.radio0.disabled=0")
-        os.execute("uci set wireless.radio1.disabled=0")
-        os.execute("uci set network.wan.disabled=0")
-        os.execute("uci set mcu.global.power_saveing=0")
-    end
-    os.execute("uci commit wireless && uci commit network && uci commit mcu")
-    file.sync()
-    if on then
-        os.execute("ifdown wan")
-        os.execute("wifi down")
-    else
-        os.execute("ifup wan")
-        os.execute("wifi up")
-    end
+    os.execute("/usr/bin/mcu-switch boot >/dev/null 2>&1 &")
 end
 
 -- power button held 3 s: mcu-switch runs the configured action (default: standby toggle)
-local function long_press(on)
+local function long_press()
     force_frames = 5   -- ~25 s: outlasts a 20 s pop-up of an external command
-    local f = io.open("/usr/bin/mcu-switch")
-    if f then
-        f:close()
-        os.execute("/usr/bin/mcu-switch long >/dev/null 2>&1 &")
-    else
-        power_saving_mode(on)
-    end
+    os.execute("/usr/bin/mcu-switch long >/dev/null 2>&1 &")
 end
 
 local function result_hander(tmp_data)
@@ -196,7 +153,7 @@ local function result_hander(tmp_data)
     if tmp_data:find("{\"shut_down\": \"1\"}") then
         system_shutdown()
     elseif tmp_data:find("Power_Saving_on") then
-        long_press(1)
+        long_press()
     elseif tmp_data:find("Power_Saving_off") then
         long_press()
     elseif tmp_data:sub(1, 4) == "{OK}" then

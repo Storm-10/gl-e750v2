@@ -1,0 +1,104 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Output new message(s) to GL-E750 display"
+msgstr "Hiển thị tin nhắn mới trên màn hình GL-E750"
+
+msgid "Display is limited to Latin alphabet only. Translit will be used for Cyrillic symbols. E.g. Bud'te schastlivy!"
+msgstr "Màn hình chỉ hỗ trợ chữ Latinh. Ký tự Kirin sẽ được chuyển tự. Ví dụ: Bud'te schastlivy!"
+
+msgid "Show only the last message"
+msgstr "Chỉ hiển thị tin nhắn mới nhất"
+
+msgid "When off all unread SMS will be displayed cycling in the order of time received starting with the most recent."
+msgstr "Khi tắt, tất cả SMS chưa đọc sẽ được hiển thị luân phiên theo thứ tự thời gian nhận, bắt đầu từ tin mới nhất."
+
+msgid "Time to display messages, seconds"
+msgstr "Thời gian hiển thị tin nhắn, giây"
+
+msgid "Timer restarts on input. Configure actions in 'Buttons'."
+msgstr "Bộ đếm giờ khởi động lại khi có thao tác. Cấu hình thao tác trong \"Nút bấm\"."
+
+msgid "Flash GL-E750 display"
+msgstr "Nhấp nháy màn hình GL-E750"
+
+msgid "AmneziaWG full tunnel"
+msgstr "AmneziaWG: tunnel toàn phần"
+
+msgid "Sets AmneziaWG to full tunnel: configured interface started if down, all remote traffic routed via AmneziaWG."
+msgstr "Đặt AmneziaWG ở chế độ tunnel toàn phần: giao diện đã cấu hình sẽ được khởi động nếu đang tắt, toàn bộ lưu lượng ra ngoài được định tuyến qua AmneziaWG."
+
+msgid "AmneziaWG split tunnel"
+msgstr "AmneziaWG: tunnel chia tách"
+
+msgid "Sets AmneziaWG to split tunnel: configured interface started if down, only traffic to subnets listed in /etc/split-routes/*.lst files routed via AmneziaWG."
+msgstr "Đặt AmneziaWG ở chế độ tunnel chia tách: giao diện đã cấu hình sẽ được khởi động nếu đang tắt, chỉ lưu lượng tới các mạng con liệt kê trong tệp /etc/split-routes/*.lst được định tuyến qua AmneziaWG."
+
+msgid "Stop AmneziaWG"
+msgstr "Dừng AmneziaWG"
+
+msgid "Start Passwall2"
+msgstr "Khởi chạy Passwall2"
+
+msgid "Stop Passwall2"
+msgstr "Dừng Passwall2"
+
+msgid "Show SMS"
+msgstr "Hiển thị SMS"
+
+msgid "Show SMS on GL-E750 display. Additional settings in \"Inbox\""
+msgstr "Hiển thị SMS trên màn hình GL-E750. Cài đặt bổ sung trong \"Hộp thư đến\""
+
+msgid "Toggle Standby mode"
+msgstr "Bật/tắt chế độ chờ"
+
+msgid "Toggle Metrics"
+msgstr "Bật/tắt chỉ số"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exits automatically after 10 min."
+msgstr "Hiển thị chỉ số hệ thống trên màn hình GL-E750: băng thông qua giao diện WAN, số kết nối, tải, mức sử dụng CPU, bộ nhớ còn trống. Màn hình thứ hai: RSRP, RSRQ, SINR, RSSI của tín hiệu. Gạt công tắc để đổi màn hình. Tự động thoát sau 10 phút."
+
+msgid "Enable action"
+msgstr "Bật hành động"
+
+msgid "Long press"
+msgstr "Nhấn giữ"
+
+msgid "Hold right button for 3 s."
+msgstr "Giữ nút bên phải trong 3 giây."
+
+msgid "Double flip"
+msgstr "Gạt kép"
+
+msgid "Flip switch and back to original position within 2 s."
+msgstr "Gạt công tắc rồi trả về vị trí ban đầu trong vòng 2 giây."
+
+msgid "Next page"
+msgstr "Trang tiếp theo"
+
+msgid "Next message"
+msgstr "Tin nhắn tiếp theo"
+
+msgid "Previous message"
+msgstr "Tin nhắn trước"
+
+msgid "Replay message"
+msgstr "Hiển thị lại tin nhắn"
+
+msgid "Mark all read and exit"
+msgstr "Đánh dấu tất cả đã đọc và thoát"
+
+msgid "Exit"
+msgstr "Thoát"
+
+msgid "Switch flip"
+msgstr "Gạt công tắc"
+
+msgid "Show SMS mode"
+msgstr "Chế độ hiển thị SMS"
+
+msgid "This mode also activates if configured in 'Inbox'. Button actions below apply only to this mode."
+msgstr "Chế độ này cũng được kích hoạt nếu được cấu hình trong \"Hộp thư đến\". Thao tác nút bên dưới chỉ áp dụng cho chế độ này."
+
+msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
+msgstr "Hiện biểu tượng thông báo tin nhắn mới trên trang tổng quan trạng thái và màn hình GL-E750"

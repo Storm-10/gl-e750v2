@@ -57,6 +57,8 @@ CONFIG_PACKAGE_luci-i18n-passwall2-ru=y
 # CONFIG_FEED_passwall_luci is not set
 # CONFIG_FEED_passwall_packages is not set
 CONFIG_PACKAGE_luci-app-5gmodem=y
+CONFIG_PACKAGE_luci-app-gl-e750=y
+CONFIG_PACKAGE_luci-i18n-gl-e750-ru=y
 # CONFIG_FEED_5gmodem is not set
 CONFIG_PACKAGE_kmod-amneziawg=m
 CONFIG_PACKAGE_amneziawg-tools=m

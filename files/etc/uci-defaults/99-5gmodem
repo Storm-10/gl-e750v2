@@ -1,5 +1,7 @@
 #!/bin/sh
 
+[ -f /etc/config/5gmodem ] || exit 0
+
 uci -q batch <<'EOF'
 
 set 5gmodem.@5gmodem[0].esim_apdu='uqmi'
@@ -38,5 +40,11 @@ EOF
 
 /etc/init.d/5gmodem-mm-inhibit stop
 /etc/init.d/5gmodem-mm-inhibit disable
+
+# wan is proto qmi (uqmi): ModemManager only competes for /dev/cdc-wdm0. 5gmodem starts it on demand (mmneed.sh).
+[ "$(uci -q get network.wan.proto)" = modemmanager ] || [ ! -x /etc/init.d/modemmanager ] || {
+	/etc/init.d/modemmanager stop
+	/etc/init.d/modemmanager disable
+}
 
 exit 0

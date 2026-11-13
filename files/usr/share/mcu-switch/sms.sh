@@ -53,7 +53,7 @@ if [ "$2" = new ] && [ "$FL" = 1 ]; then         # flash display; mcu_flash s if
    [ "$ON" = 1 ] || { clr; exit 0; }
 fi
 
-kill -0 $JP 2>/dev/null && send "SMS" "loading..."
+kill -0 $JP 2>/dev/null && send "SMS" "Loading..."
 while kill -0 $JP 2>/dev/null; do wait $JP; done                            # wait returns early on USR1
 jq -r '.sms[] | [.time, (if ((" " + (.miss // "") + " ") | contains(" seen ")) then 1 else 0 end),
    .key, .sender, (.text | split("\r") | join("") | split("\n") | join(" ") | split("\t") | join(" "))] | @tsv' \

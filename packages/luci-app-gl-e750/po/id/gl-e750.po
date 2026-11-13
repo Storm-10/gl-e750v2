@@ -1,0 +1,104 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Output new message(s) to GL-E750 display"
+msgstr "Tampilkan pesan baru di layar GL-E750"
+
+msgid "Display is limited to Latin alphabet only. Translit will be used for Cyrillic symbols. E.g. Bud'te schastlivy!"
+msgstr "Layar hanya mendukung huruf Latin. Karakter Sirilik akan ditransliterasi. Contoh: Bud'te schastlivy!"
+
+msgid "Show only the last message"
+msgstr "Tampilkan hanya pesan terakhir"
+
+msgid "When off all unread SMS will be displayed cycling in the order of time received starting with the most recent."
+msgstr "Jika nonaktif, semua SMS belum dibaca ditampilkan bergiliran sesuai urutan waktu diterima, dimulai dari yang terbaru."
+
+msgid "Time to display messages, seconds"
+msgstr "Waktu tampilan pesan, detik"
+
+msgid "Timer restarts on input. Configure actions in 'Buttons'."
+msgstr "Timer dimulai ulang saat ada input. Atur aksi di \"Tombol\"."
+
+msgid "Flash GL-E750 display"
+msgstr "Kedipkan layar GL-E750"
+
+msgid "AmneziaWG full tunnel"
+msgstr "AmneziaWG: tunnel penuh"
+
+msgid "Sets AmneziaWG to full tunnel: configured interface started if down, all remote traffic routed via AmneziaWG."
+msgstr "Mengatur AmneziaWG ke tunnel penuh: antarmuka yang dikonfigurasi dijalankan jika mati, semua lalu lintas ke luar dirutekan melalui AmneziaWG."
+
+msgid "AmneziaWG split tunnel"
+msgstr "AmneziaWG: tunnel terpisah"
+
+msgid "Sets AmneziaWG to split tunnel: configured interface started if down, only traffic to subnets listed in /etc/split-routes/*.lst files routed via AmneziaWG."
+msgstr "Mengatur AmneziaWG ke tunnel terpisah: antarmuka yang dikonfigurasi dijalankan jika mati, hanya lalu lintas ke subnet yang tercantum dalam file /etc/split-routes/*.lst yang dirutekan melalui AmneziaWG."
+
+msgid "Stop AmneziaWG"
+msgstr "Hentikan AmneziaWG"
+
+msgid "Start Passwall2"
+msgstr "Jalankan Passwall2"
+
+msgid "Stop Passwall2"
+msgstr "Hentikan Passwall2"
+
+msgid "Show SMS"
+msgstr "Tampilkan SMS"
+
+msgid "Show SMS on GL-E750 display. Additional settings in \"Inbox\""
+msgstr "Tampilkan SMS di layar GL-E750. Pengaturan tambahan di \"Kotak masuk\""
+
+msgid "Toggle Standby mode"
+msgstr "Alihkan mode siaga"
+
+msgid "Toggle Metrics"
+msgstr "Alihkan metrik"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exits automatically after 10 min."
+msgstr "Menampilkan metrik sistem di layar GL-E750: lebar pita melalui antarmuka WAN, jumlah koneksi, beban, penggunaan CPU, memori tersedia. Layar kedua: RSRP, RSRQ, SINR, RSSI sinyal. Ganti layar dengan menggeser sakelar. Keluar otomatis setelah 10 menit."
+
+msgid "Enable action"
+msgstr "Aktifkan aksi"
+
+msgid "Long press"
+msgstr "Tekan lama"
+
+msgid "Hold right button for 3 s."
+msgstr "Tahan tombol kanan selama 3 detik."
+
+msgid "Double flip"
+msgstr "Geser ganda"
+
+msgid "Flip switch and back to original position within 2 s."
+msgstr "Geser sakelar lalu kembalikan ke posisi semula dalam 2 detik."
+
+msgid "Next page"
+msgstr "Halaman berikutnya"
+
+msgid "Next message"
+msgstr "Pesan berikutnya"
+
+msgid "Previous message"
+msgstr "Pesan sebelumnya"
+
+msgid "Replay message"
+msgstr "Tampilkan ulang pesan"
+
+msgid "Mark all read and exit"
+msgstr "Tandai semua sudah dibaca dan keluar"
+
+msgid "Exit"
+msgstr "Keluar"
+
+msgid "Switch flip"
+msgstr "Geser sakelar"
+
+msgid "Show SMS mode"
+msgstr "Mode tampilan SMS"
+
+msgid "This mode also activates if configured in 'Inbox'. Button actions below apply only to this mode."
+msgstr "Mode ini juga aktif jika dikonfigurasi di \"Kotak masuk\". Aksi tombol di bawah hanya berlaku untuk mode ini."
+
+msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
+msgstr "Tampilkan ikon notifikasi pesan baru di halaman ringkasan status dan layar GL-E750"
