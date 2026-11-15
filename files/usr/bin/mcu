@@ -63,6 +63,67 @@ local warning = {
     capacity = capacity
 }
 
+
+-- syslog: always ERR..INFO (start/stop, errors, user/script events, abnormal states);
+-- DEBUG (uci mcu.global.debug=1, applied at start or by 'ubus call mcu reload') adds serial traffic
+log.set_ident("mcu")
+
+local log_debug = false
+local function apply_log_level()
+    local c = uci.cursor()
+    local dbg = c:get("mcu", "global", "debug") == "1"
+    c:close()
+    log.set_level(dbg and log.DEBUG or log.INFO)
+    if dbg ~= log_debug then
+        log_debug = dbg
+        log.info("debug logging " .. (dbg and "enabled" or "disabled"))
+    end
+end
+
+local function mask(s)
+    return (tostring(s):gsub('("key[%w_]*": ")[^"]*', '%1***'))
+end
+
+local serial_ok = true
+local no_reply = 0
+local bat = { temp = "ok", low = false, chg = nil }
+
+-- logs battery threshold crossings (hysteresis = interval) and charge state changes once per change
+local function battery_check(t, cap, chg)
+    local w = warning
+    if t then
+        local s = bat.temp
+        if t >= w.temp_high.value then s = "high"
+        elseif t <= w.temp_low.value then s = "low"
+        elseif (s == "high" and t <= w.temp_high.value - w.temp_high.interval)
+            or (s == "low" and t >= w.temp_low.value + w.temp_low.interval) then s = "ok" end
+        if s ~= bat.temp then
+            if s == "ok" then
+                log.info(string.format("battery temperature back to normal: %.1f C", t))
+            else
+                log.log(log.CRIT, string.format("battery temperature too %s: %.1f C (limit %s C)",
+                    s, t, s == "high" and w.temp_high.value or w.temp_low.value))
+            end
+            bat.temp = s
+        end
+    end
+    if cap then
+        if not bat.low and cap <= w.capacity.value then
+            bat.low = true
+            log.log(log.WARNING, string.format("battery low: %d%%", cap))
+        elseif bat.low and cap >= w.capacity.value + w.capacity.interval then
+            bat.low = false
+            log.info(string.format("battery recovered: %d%%", cap))
+        end
+    end
+    if chg and chg ~= bat.chg then
+        if bat.chg then
+            log.info("battery charge state changed: " .. bat.chg .. " -> " .. chg)
+        end
+        bat.chg = chg
+    end
+end
+
 local mcu = {
     abnormal = 0,
     abnormal_type = 0,
@@ -130,6 +191,7 @@ battery_state = {
 }
 
 local function system_shutdown()
+    log.log(log.NOTICE, "MCU requested shutdown, unmounting filesystems")
     os.execute("/etc/init.d/umount stop")
 end
 
@@ -139,7 +201,8 @@ local function clear_power_saving()
 end
 
 -- power button held 3 s: mcu-switch runs the configured action (default: standby toggle)
-local function long_press()
+local function long_press(ev)
+    log.log(log.NOTICE, "power button long press (" .. ev .. "), running mcu-switch long")
     force_frames = 5   -- ~25 s: outlasts a 20 s pop-up of an external command
     os.execute("/usr/bin/mcu-switch long >/dev/null 2>&1 &")
 end
@@ -153,15 +216,15 @@ local function result_hander(tmp_data)
     if tmp_data:find("{\"shut_down\": \"1\"}") then
         system_shutdown()
     elseif tmp_data:find("Power_Saving_on") then
-        long_press()
+        long_press("Power_Saving_on")
     elseif tmp_data:find("Power_Saving_off") then
-        long_press()
+        long_press("Power_Saving_off")
     elseif tmp_data:sub(1, 4) == "{OK}" then
         local capacity, temp, chg_state, charge_cycle = tmp_data:match('(%d+),(-?[%d%.]+),(%d+),*(%d*)')
         if not temp then
             pending_mcu_reply = tmp_data
-            print("partial {OK} reply buffered:", tmp_data)
-            return
+            log.debug("partial MCU reply buffered: " .. tmp_data)
+            return true
         end
         if temp then
             local t = tonumber(temp)
@@ -174,7 +237,11 @@ local function result_hander(tmp_data)
         if charge_cycle and charge_cycle ~= "" then
             mcu.charge_cycle = charge_cycle
         end
+        battery_check(tonumber(mcu.temp), tonumber(mcu.capacity), mcu.chg_state)
+    else
+        return false
     end
+    return true
 end
 
 local function is_another_mcu_running()
@@ -204,10 +271,12 @@ local function flock(filename)
         if f ~= nil then
             f:close()
             if fail_count > 10 and not is_another_mcu_running() then
-                log.err("get lock /tmp/mcu.lock failed for 10 times and no another mcu is running, forced unlocking")
+                log.log(log.WARNING, "stale lock " .. filename .. " (no other mcu running), removing")
                 os.remove(filename)
             else
-                log.err("get lock /tmp/mcu.lock failed")
+                if fail_count == 0 then
+                    log.log(log.WARNING, "lock " .. filename .. " held, waiting")
+                end
                 fail_count = fail_count + 1
             end
         else
@@ -249,16 +318,24 @@ local function read_fun(fd, wait_timeout)
     end
 end
 
+local function serial_fail(what, err)
+    if serial_ok then
+        serial_ok = false
+        log.err(string.format("serial %s %s failed: %s", dev, what, tostring(err)))
+    end
+end
+
 local function get_serial_data(dev, baudrate, data)
-    local fd = file.open(dev, file.O_RDWR | file.O_NOCTTY)
+    local fd, err = file.open(dev, file.O_RDWR | file.O_NOCTTY)
     if not fd then
-        print("open serial failed:", dev)
+        serial_fail("open", err)
         return
     end
 
-    local attr, err = termios.tcgetattr(fd.fd)
+    local attr
+    attr, err = termios.tcgetattr(fd.fd)
     if not attr then
-        print("tcgetattr", err)
+        serial_fail("tcgetattr", err)
         fd:close()
         return
     end
@@ -276,9 +353,13 @@ local function get_serial_data(dev, baudrate, data)
 
     local ok, err = termios.tcsetattr(fd.fd, termios.TCSANOW, nattr)
     if not ok then
-        print('tcsetattr:', err)
+        serial_fail("tcsetattr", err)
         fd:close()
         return
+    end
+    if not serial_ok then
+        serial_ok = true
+        log.info("serial " .. dev .. " recovered")
     end
 
     if type(data) == "table" then
@@ -292,26 +373,36 @@ local function get_serial_data(dev, baudrate, data)
     end
 
     if tmp_data then
-        print("read tmp data====", tmp_data)
-        result_hander(tmp_data)
+        log.debug("rx unsolicited: " .. tmp_data)
+        if not result_hander(tmp_data) then
+            log.log(log.NOTICE, "unrecognized data from MCU: " .. tmp_data)
+        end
     end
 
     if data and (data ~= last_msg or flag ~= 3 or mcu_status_flag == 1 or force_frames > 0) then
-        print("send msg ======", data)
         mcu_status_flag = 0
         if force_frames > 0 then force_frames = force_frames - 1 end
         fd:write(data)
 
-        local err
         if read_lock_flag == 0 then
             result, err = read_fun(fd, 3)  -- wait up to 3s for MCU response
-        end
-
-        if not result then
-            print('reade err:', err)
+            if result then
+                log.debug("tx: " .. mask(data) .. " | rx: " .. result)
+                if no_reply >= 3 then
+                    log.info("MCU responding again")
+                end
+                no_reply = 0
+                result_hander(result)
+            else
+                log.debug("tx: " .. mask(data) .. " | no reply: " .. tostring(err))
+                no_reply = no_reply + 1
+                if no_reply == 3 then
+                    log.err("MCU not responding (3 requests without reply)")
+                end
+            end
         else
-            print('read:', result)
-            result_hander(result)
+            -- another coroutine is reading the port; it consumes the reply
+            log.debug("tx: " .. mask(data) .. " | reply read concurrently")
         end
     end
 
@@ -358,12 +449,7 @@ end
 
 local function uart_write(buf)
     local msg = format_massage(buf)
-    print("send mcu:",msg)
-    local have_data = get_serial_data(dev, baudrate, msg)
-    if have_data then
-        print("data:",have_data)
-    end
-    return have_data
+    return get_serial_data(dev, baudrate, msg)
 end
 
 local function mcu_set_config(res)
@@ -803,7 +889,6 @@ end
 
 local function get_info()
     local res = {}
-    print("function get_info")
     get_ap_info(res)
     get_vpn_info(res)
     get_router_info(res)
@@ -826,7 +911,6 @@ local function timer_monitor()
     --print("send msg ======", msg)
     local have_data = msg and get_serial_data(dev, baudrate, msg)
     if have_data then
-        print("mcu_msg",have_data)
         result_hander(have_data)
         publish_mcu_status()
         last_msg = msg
@@ -1492,6 +1576,8 @@ local function ubus_init()
             },
             reload = {
                 function(req)
+                    log.info("ubus: reload")
+                    apply_log_level()
                     if battery_info.serial then
                         flag = 2
                         timer_monitor()
@@ -1527,6 +1613,7 @@ local function ubus_init()
                 function(req, msg)
                     if battery_info.serial then
                         local cmd = cjson.encode(msg)
+                        log.info("ubus: cmd_json " .. tostring(cmd))
                         if cmd then
                             cmd = string.gsub(cmd, ":",": ")
                             local have_data = get_serial_data(dev, baudrate, cmd)
@@ -1544,6 +1631,7 @@ local function ubus_init()
                 function(req, msg)
                     if battery_info.serial then
                         if msg.cmd then
+                            log.info("ubus: cmd_string " .. msg.cmd)
                             local have_data = get_serial_data(dev, baudrate, msg.cmd)
                             if have_data then
                                 local res = {
@@ -1557,6 +1645,7 @@ local function ubus_init()
             },
             set_warning = {
                 function(req, msg)
+                    log.info("ubus: set_warning " .. cjson.encode(msg))
                     for name, table in pairs(msg) do
                         if warning[name] ~= nil then
                             for k, v in pairs(table) do
@@ -1583,6 +1672,7 @@ local function ubus_init()
                     if battery_info.serial then
                         local res = {}
                         res.system = "reboot"
+                        log.info("ubus: notify MCU system=reboot")
                         send_msg_lock_flag = 1
                         uart_write(res)
                     end
@@ -1593,6 +1683,7 @@ local function ubus_init()
                     if battery_info.serial then
                         local res = {}
                         res.system = "updating"
+                        log.info("ubus: notify MCU system=updating")
                         send_msg_lock_flag = 1
                         uart_write(res)
                     end
@@ -1604,6 +1695,7 @@ local function ubus_init()
                         local res = {}
                         if type(msg) == "table" and msg.system and msg.system == "reft" then
                             res.system = "reft"
+                            log.info("ubus: notify MCU system=reft")
                             send_msg_lock_flag = 1
                             uart_write(res)
                         end
@@ -1616,6 +1708,7 @@ local function ubus_init()
                         local res = {}
                         if type(msg) == "table" and msg.system and msg.system == "renw" then
                             res.system = "renw"
+                            log.info("ubus: notify MCU system=renw")
                             uart_write(res)
                         end
                     end
@@ -1627,6 +1720,7 @@ local function ubus_init()
                         local res = {}
                         if type(msg) == "table" and msg.button and send_msg_lock_flag ~= 1 then
                             res.button = msg.button
+                            log.info("ubus: reset_button " .. tostring(msg.button))
                             uart_write(res)
                         end
                     end
@@ -1635,6 +1729,7 @@ local function ubus_init()
             set_product_flag = {
                 function(req, msg)
                     local res = {}
+                    log.info("ubus: set_product_flag " .. tostring(type(msg) == "table" and msg.product_flag))
                     if type(msg) == "table" and msg.product_flag and msg.product_flag == "1" then
                         product_test_flag = 1
                         res.data = "product_test_up"
@@ -1652,6 +1747,7 @@ local function ubus_init()
                 function(req, msg)
                     if battery_info.serial then
                         local data = format_massage(msg)
+                        log.info("ubus: send_custom_msg " .. mask(data))
                         local res = {}
                         if read_lock_flag == 0 then
                             res.data = get_serial_data(dev, baudrate, data)
@@ -1744,7 +1840,6 @@ local function serial_init()
     dev = c:get("glconfig", "mcu", "dev") or device or "/dev/ttyUSB0"
     baudrate = tonumber(c:get("glconfig", "mcu", "baudrate") or rate or "9600")
     flock(lockfile)
-    log.info("open %s for baudrate %d", dev, baudrate)
 end
 
 local function battery_init()
@@ -1756,6 +1851,7 @@ local function battery_init()
     end
 end
 
+apply_log_level()
 battery_init()
 warning_init()
 
@@ -1764,36 +1860,24 @@ if battery_info.serial then
 end
 
 mcu_init()
+log.info(battery_info.serial
+    and string.format("started: serial %s at %s baud, display %s", dev, baudrate, oled_flag and "on" or "off")
+    or "started: battery driver " .. battery_info.driver)
 
 
-sys.signal(sys.SIGINT, function()
-    log.info('\nGot SIGINT, now quit')
+local function quit(sig, crit)
+    log.log(crit and log.CRIT or log.INFO, "stopping on " .. sig)
     unflock(lockfile)
     eco.unloop()
-end)
+end
 
-sys.signal(sys.SIGTERM, function()
-    log.info('\nGot SIGTERM, now quit')
-    unflock(lockfile)
-    eco.unloop()
-end)
-
-sys.signal(sys.SIGALRM, function()
-    log.info('\nGot SIGALRM, now quit')
-    unflock(lockfile)
-    eco.unloop()
-end)
-
-sys.signal(sys.SIGSEGV, function()
-    log.info('\nGot SIGALRM, now quit')
-    unflock(lockfile)
-    eco.unloop()
-end)
+sys.signal(sys.SIGINT, function() quit("SIGINT") end)
+sys.signal(sys.SIGTERM, function() quit("SIGTERM") end)
+sys.signal(sys.SIGALRM, function() quit("SIGALRM") end)
+sys.signal(sys.SIGSEGV, function() quit("SIGSEGV", true) end)
 
 eco.run(ubus_init)
 clear_power_saving()
-
-log.set_level(log.INFO)
 
 if oled_flag then
     eco.run( function()

@@ -9,13 +9,14 @@ config global 'global'
 	option content ''
 	option wifi_password_enabled '1'
 	option power_saveing '0'
+	option debug '1'
 	# standby_restore: set by mcu-switch while in standby - what it switched off and will switch back on
 
 # mcu-switch: actions used when luci-app-5gmodem "Buttons" has no section for the button
 config switch 'switch'
 	option cmd_on ''
 	option cmd_off ''
-	option cmd_double '/usr/bin/mcu-switch meters'
+	option cmd_double '/usr/bin/mcu-switch sms'
 	option cmd_long '/usr/bin/mcu-switch standby'
 	option gesture '2'
 	option refresh '2'
