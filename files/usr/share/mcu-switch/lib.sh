@@ -106,16 +106,14 @@ mine() { [ -z "$ME" ] && return 0; read -r p _ 2>/dev/null < "$PID"; [ "$p" = "$
 send() {                                                                      # rows -> MCU pop-up (20 s or until next)
     mine; printf "{\"msg\": \"%-16.16s%-16.16s%-16.16s%-16.16s\"}" "$@" > "$TTY" || [ -n "$WE" ] || { WE=1; err "cannot write $TTY"; }
 }
-mcuref() { ubus -t 3 call mcu reload >/dev/null 2>&1; }      # daemon sends a status frame now (1-3 s): ends MCU's own "Standby mode" screen
-clr() {                                                       # dismiss pop-up: standard screens return
-   mine; printf '{"msg": " "}' > "$TTY"
-   [ -e "$LP" ] && { rm -f "$LP"; mcuref; }                   # only after a long press: MCU switched its first screen itself
-}
+say() { send "" "$@"; }                                        # status on row 2, detail on row 3; row 1 blank as MCU's own messages
+mcuref() { ubus -t 3 call mcu reload >/dev/null 2>&1; }      # daemon sends a status frame now (1-3 s)
+clr() { mine; [ -e "$LP" ] || printf '{"msg": " "}' > "$TTY"; }   # dismiss pop-up; after a long press the daemon does it with the ps resync
 owner() { OP= OK=; [ -f "$PID" ] && read -r OP OK < "$PID"; [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null || OP= OK=; }
-own() {                                                        # take the screen as kind $1: f flip, r module, m metrics, s SMS, t standby
+own() {                                                        # take the screen as kind $1: f flip, a action, r module, m metrics, s SMS, t standby
    [ -n "$MCU_GEN" ] && { read -r p 2>/dev/null < "$GEN"; [ "$p" = "$MCU_GEN" ] || { log "$ARGS: superseded sequence: skipped"; exit 0; }; }
    echo "${MCU_GEN:-$$}" > "$GEN"                              # gesture sequence id: a later one skips our next calls
-   owner; echo "$$ $1" > "$PID"; ME=$$; [ -n "$OP" ] && [ "$OP" != $$ ] && kill "$OP" 2>/dev/null
+   owner; echo "$$ $1" > "$PID"; ME=$$; [ -n "$OP" ] && [ "$OP" != $$ ] && [ "$OP" != "$MCU_GEN" ] && kill "$OP" 2>/dev/null
    trap '[ -s "$PID" ] && read -r p _ < "$PID" && [ "$p" = $$ ] && : > "$PID"' EXIT
 }
 SIG=/tmp/mcu-switch.sig

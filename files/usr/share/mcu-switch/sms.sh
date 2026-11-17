@@ -22,7 +22,7 @@ if [ "$2" = new ]; then                                                       # 
    F=; [ -z "$K" ] || { [ -s $NOTI ] && ! printf '%s\n' "$K" | grep -qvxF -f $NOTI; } || F=1   # a key not notified yet
    [ -n "$F" ] || { echo "$K" > $NOTI; exit 0; }
    [ "$FL$ON" != 00 ] || { echo "$K" > $NOTI; exit 0; }
-   owner; case $OK in f|r|t|s) log "sms: new message, screen busy ($OK): retry next round"; exit 0 ;; esac
+   owner; case $OK in f|a|r|t|s) log "sms: new message, screen busy ($OK): retry next round"; exit 0 ;; esac
    echo "$K" > $NOTI; log "sms: new message"
 fi
 GOT=; trap 'GOT=1' USR1; own s
@@ -30,7 +30,7 @@ JP=; [ "$2" = new ] && [ "$ON" != 1 ] || {                                 # loa
    $SB unseen all,seen "$(uci -q get 5gmodem.sms.storage)" "$(uci -q get 5gmodem.sms.readport)" > $LST.j 2>/dev/null </dev/null & JP=$!; }
 input() { GOT=; A=; read -r A < "$IN" 2>/dev/null; : > "$IN"; g "mcu_$A" ""; ACT=$R
    [ -n "$ACT" ] || case $A in flip) ACT=page ;; double) ACT=read ;; long) ACT=exit ;; esac
-   log "sms: $A -> $ACT"; [ "$ACT" = exit ] && send "SMS" "Exiting..."; }      # replaces MCU's own "Standby mode" at once
+   log "sms: $A -> $ACT"; [ "$ACT" = exit ] && say "  SMS Exit"; }      # replaces MCU's own "Standby mode" at once
 bye() { nap 1; clr; log "sms: exit"; exit 0; }
 
 if [ "$2" = new ] && [ "$FL" = 1 ]; then         # flash display; mcu_flash s if set; or until input
@@ -53,7 +53,7 @@ if [ "$2" = new ] && [ "$FL" = 1 ]; then         # flash display; mcu_flash s if
    [ "$ON" = 1 ] || { clr; exit 0; }
 fi
 
-kill -0 $JP 2>/dev/null && send "SMS" "Loading..."
+kill -0 $JP 2>/dev/null && say "  SMS Load..."
 while kill -0 $JP 2>/dev/null; do wait $JP; done                            # wait returns early on USR1
 jq -r '.sms[] | [.time, (if ((" " + (.miss // "") + " ") | contains(" seen ")) then 1 else 0 end),
    .key, .sender, (.text | split("\r") | join("") | split("\n") | join(" ") | split("\t") | join(" "))] | @tsv' \
