@@ -28,13 +28,10 @@ case "$2" in
 esac
 own r; elapsed
 trap 'log "$NAME $STATE: superseded at ${EL}s"; exit 0' TERM INT HUP
-[ -n "$CMD" ] || { err "$NAME: no cmd_$2 configured"; send "$NAME" "no cmd_$2 set"; nap 5; clr; exit 1; }
+[ -n "$CMD" ] || { err "$NAME: no cmd_$2 configured"; final "$NAME ERROR" "no cmd_$2 set"; exit 1; }
 [ -z "$ISX" ] && [ -n "$ISON" ] && case $2 in on) ISX=$ISON ;; off) ISX="! { $ISON; }" ;; esac
 if [ -n "$ISX" ] && sh -c "$ISX" >/dev/null 2>&1; then                         # already there
-   log "$NAME already $2: nothing to do"
-   S=${OKT:-ON}; [ "$2" = off ] && S=OFF; rj $(((16 + ${#S}) / 2)) "$S"
-   case $MCU_G in on|off) send "$NAME already" "$R" "Flip ignored to" "match state" ;; *) send "$NAME already" "$R" "" "Nothing to do" ;; esac
-   nap "$TAIL"; clr; exit 0
+   log "$NAME already $2: nothing to do"; final "$NAME ${OKT:-$OKS}" already; exit 0
 fi
 log "$NAME $STATE: running cmd_$2"
 WATCH=$LOGS; scan                                                             # log line counts before command
@@ -42,7 +39,7 @@ read -r _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ NI _ < /proc/$$/stat              # 
 nice -n $((-NI)) sh -c "$CMD" </dev/null >/dev/null 2>&1 & CP=$!
 sample
 while :; do
-   [ -n "$END" ] && [ "$DL" -ge "$END" ] && { clr; log "$NAME $STATE: screen released"; [ "$STATE" = "$OKS" ]; exit; }
+   [ -n "$END" ] && [ "$DL" -ge "$END" ] && { S=$STATE; [ "$S" = "$OKS" ] && S=${OKT:-$OKS}; final "$NAME $S"; log "$NAME $STATE: screen released"; [ "$STATE" = "$OKS" ]; exit; }
    rj $((15 - ${#NAME} - ${#STATE})) "${FZ:-$EL}s"; R1="$NAME $STATE$R"; [ -n "$LD" ] && rows
    [ "$STATE" = "$OKS" ] && [ -n "$OKT" ] && { rj $(((16 + ${#OKT}) / 2)) "$OKT"; R2=$R; }
    send "$R1" "$R2" "$R3" "$R4"

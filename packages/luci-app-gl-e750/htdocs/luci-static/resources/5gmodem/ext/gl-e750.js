@@ -10,6 +10,7 @@
 var MCU = '/usr/bin/mcu-switch';
 var BSH = '/usr/share/5gmodem/buttons.sh';
 var E750 = {};	// "gl_e750" of buttons.sh detect
+var noMenu = false;	// presets of menu items: no menu in the menu
 
 function has(services, s) { return (services || []).indexOf(s) >= 0; }
 
@@ -49,16 +50,19 @@ return baseclass.extend({
 		(data.buttons || []).forEach(function(b) { if (b.name === 'power') { b.label = _('Long press'); } });
 		if (!document.getElementById('gl-e750-css')) {
 			document.head.appendChild(E('style', { 'id': 'gl-e750-css' },
-				'.btnsw[role=switch]{cursor:pointer}.btnsw[role=switch]:focus-visible{outline:2px solid var(--tg-accent);outline-offset:2px}'));
+				'.btnsw[role=switch]{cursor:pointer}.btnsw[role=switch]:focus-visible{outline:2px solid var(--tg-accent);outline-offset:2px}' +
+				'.e750row{display:flex;align-items:center;gap:.4em;padding:.15em 0;border:2px solid transparent;border-width:2px 0}' +
+				'.e750row .btncmd{flex:1;min-width:0}.e750row .btncmd .cbi-value-description{display:none!important}' +
+				'.e750row>button,.e750row .btnseg{flex:none;margin:0!important}.e750row.dragging{opacity:.5}' +
+				'.e750row .btnseg{display:inline-grid;grid-template-columns:1fr 1fr}.e750row .btnseg button{font-weight:600}' +
+				'.e750row.drag-over-above{border-top-color:#0069d6}.e750row.drag-over-below{border-bottom-color:#0069d6}'));
 		}
 	},
 
 	presets: function(kind, services) {
 		if (kind === 'conditional') {
 			return [
-				{ label: _('Toggle Standby mode'), cmd: MCU + ' standby' },
-				{ label: _('Toggle Metrics'), cmd: MCU + ' metrics',
-					help: _('Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exits automatically after 10 min.') }
+				{ label: _('Toggle Standby mode'), cmd: MCU + ' standby' }
 			];
 		}
 		var l = [];
@@ -74,7 +78,13 @@ return baseclass.extend({
 			l.push({ label: _('Stop Passwall2'), cmd: MCU + ' pw off' });
 		}
 		l.push({ label: _('Show SMS'), cmd: MCU + ' sms',
-			help: _('Show SMS on GL-E750 display. Additional settings in "Inbox"') });
+			help: _('Show SMS on GL-E750 display. Next page by switch flip. Long press offers to mark all messages read. Additional settings in "Inbox"') });
+		l.push({ label: _('Show Metrics'), cmd: MCU + ' metrics',
+			help: _('Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exit by long press or automatically after 10 min.') });
+		if (!noMenu) {
+			l.push({ label: _('Show Menu'), cmd: MCU + ' menu',
+				help: _("Show menu on GL-E750 display. Next item by switch flip, run selected item by long press. Exit by 'EXIT menu' item or automatically after 20 s without input. Items are set in 'GL-E750 Menu'.") });
+		}
 		return l;
 	},
 
@@ -86,7 +96,7 @@ return baseclass.extend({
 		var heads = isLong ? [ [ 'pressed', _('Long press'), _('Hold right button for 3 s.') ] ] : [
 			[ 'pressed', _('Switch ON'), '' ],
 			[ 'released', _('Switch OFF'), '' ],
-			[ 'double', _('Double flip'), _('Flip switch and back to original position within 2 s.') ] ];
+			[ 'double', _('Double flip'), _('Flip switch and back to original position within the interval.') ] ];
 		var card = E('div', { 'class': 'btncard' });
 		var status = api.saveStatus();
 		var en = {};
@@ -108,11 +118,30 @@ return baseclass.extend({
 			return [ h[0], p ];
 		});
 
+		var gest = null;
+		if (!isLong) {
+			gest = E('input', { 'type': 'number', 'class': 'cbi-input-text', 'min': '1', 'max': '5', 'step': '1',
+				'style': 'width:5em', 'value': E750.gest || '2' });
+			card.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-top:.6em' }, [
+				E('label', { 'class': 'cbi-value-title' }, _('Interval, s')),
+				E('div', { 'class': 'cbi-value-field' }, [ gest,
+					E('div', { 'class': 'cbi-value-description' },
+						_('Time to flip switch back for a double flip, 1-5 s. Longer: double flip is easier, but switch ON/OFF actions start later.')) ]) ]));
+		}
+
 		card.appendChild(E('div', { 'style': 'margin-top:.9em' }, [
 			E('button', { 'class': 'btn cbi-button cbi-button-save',
 				'click': ui.createHandlerFn(this, function() {
 					// no delay between repeats: gesture timing is in mcu-switch
 					var ops = [ function() { return api.setField(b.name, 'debounce', ''); } ];
+					if (gest) {
+						if (!/^[1-5]$/.test(gest.value)) {
+							status.textContent = _('Interval: whole seconds 1-5');
+							status.style.color = '#e5484d';
+							return;
+						}
+						ops.push(function() { return fs.exec(BSH, [ 'e750gest', gest.value ]); });
+					}
 					panels.forEach(function(pair) {
 						var st = pair[0], v = pair[1].getVals();
 						if (en[st]) {
@@ -133,35 +162,114 @@ return baseclass.extend({
 		return card;
 	},
 
-	// "Show SMS mode": what the gestures do while SMS are on the display
-	cards: function(data, api) {
-		var acts = [
-			[ 'page', _('Next page') ], [ 'next', _('Next message') ], [ 'prev', _('Previous message') ],
-			[ 'replay', _('Replay message') ], [ 'read', _('Mark all read and exit') ], [ 'exit', _('Exit') ]
-		];
+	// "GL-E750 Menu": items of mcu-switch menu in display order (mcu.menu.item); "EXIT menu" is added last by mcu-switch
+	menuCard: function(api) {
 		var status = api.saveStatus();
-		var sels = [ [ 'flip', _('Switch flip') ], [ 'double', _('Double flip') ], [ 'long', _('Long press') ] ].map(function(r) {
-			return [ r[0], r[1], E('select', { 'class': 'cbi-input-select' }, acts.map(function(a) {
-				return E('option', { 'value': a[0], 'selected': E750[r[0]] === a[0] ? '' : null }, a[1]);
-			})) ];
+		var services = fs.exec(BSH, [ 'services' ]).then(function(res) {	// as buttons.js: presets depend on them
+			try { return JSON.parse(res.stdout).services || []; } catch (e) { return []; }
+		}).catch(function() { return []; });
+		var list = E('div', {});
+		var touch = ('ontouchstart' in window);
+		var dragged = null;
+
+		function clearMarks() {
+			list.querySelectorAll('.drag-over-above,.drag-over-below').forEach(function(r) {
+				r.classList.remove('drag-over-above', 'drag-over-below');
+			});
+		}
+		function mark(row, y) {	// drop target: above or below the middle of the row, as LuCI tables
+			clearMarks();
+			if (!row || row === dragged) { return; }
+			var b = row.getBoundingClientRect();
+			row.classList.add(y < b.top + b.height / 2 ? 'drag-over-above' : 'drag-over-below');
+		}
+		function end(move) {
+			var t = list.querySelector('.drag-over-above,.drag-over-below');
+			if (move && t && dragged) { list.insertBefore(dragged, t.classList.contains('drag-over-above') ? t : t.nextSibling); }
+			clearMarks();
+			if (dragged) { dragged.classList.remove('dragging'); }
+			dragged = null;
+		}
+		list.addEventListener('dragover', function(ev) {
+			if (!dragged) { return; }
+			ev.preventDefault();
+			ev.dataTransfer.dropEffect = 'move';
+			mark(ev.target.closest('.e750row'), ev.clientY);
 		});
+		list.addEventListener('drop', function(ev) { ev.preventDefault(); end(true); });
+
+		function addRow(svc, ct, cmd) {
+			noMenu = true;
+			var p = api.statePanel({ ct_item: ct, cmd_item: cmd }, [], 'item', svc);
+			noMenu = false;
+			var c = p.node.querySelector('.btncmd'), hd = c.querySelector('.btnterm-hd');
+			if (hd) { hd.parentNode.removeChild(hd); }
+			var row = E('div', { 'class': 'e750row' });
+			var handle = E('button', { 'type': 'button', 'title': _('Drag to reorder'), 'class': 'cbi-button drag-handle',
+				'style': 'cursor:move;user-select:none;-webkit-user-select:none', 'draggable': touch ? 'false' : 'true' }, '☰');
+			if (touch) {
+				handle.addEventListener('touchmove', function(ev) {
+					var t = ev.touches[0], el = document.elementFromPoint(t.clientX, t.clientY);
+					ev.preventDefault();
+					dragged = row;
+					row.classList.add('dragging');
+					mark(el && el.closest('.e750row'), t.clientY);
+				}, { passive: false });
+				handle.addEventListener('touchend', function() { end(true); });
+				handle.addEventListener('touchcancel', function() { end(false); });
+			} else {
+				handle.addEventListener('dragstart', function(ev) {
+					dragged = row;
+					row.classList.add('dragging');
+					ev.dataTransfer.effectAllowed = 'move';
+					ev.dataTransfer.setData('text/plain', '');
+					var r = row.getBoundingClientRect();   // image held where the pointer grabbed it: on the handle
+					ev.dataTransfer.setDragImage(row, ev.clientX - r.left, ev.clientY - r.top);
+				});
+				handle.addEventListener('dragend', function() { end(false); });
+			}
+			row.e750vals = p.getVals;
+			row.appendChild(p.node.querySelector('.btnseg'));
+			row.appendChild(c);
+			row.appendChild(E('button', { 'type': 'button', 'class': 'btn cbi-button cbi-button-remove',
+				'click': function() { list.removeChild(row); } }, _('Delete')));
+			row.appendChild(handle);
+			list.appendChild(row);
+		}
+		services.then(function(svc) { (E750.menu || []).forEach(function(m) { addRow(svc, m[0], m[1]); }); });
+
 		return E('div', { 'class': 'btncard' }, [
-			E('div', { 'class': 'btnstate-lbl' }, _('Show SMS mode')),
+			E('div', { 'class': 'btnstate-lbl' }, _('GL-E750 Menu')),
 			E('div', { 'class': 'cbi-value-description', 'style': 'margin-top:-.3em;margin-bottom:.6em' },
-				_("This mode also activates if configured in 'Inbox'. Button actions below apply only to this mode.")),
-			E('div', {}, sels.map(function(s) {
-				return E('div', { 'class': 'cbi-value' }, [
-					E('label', { 'class': 'cbi-value-title' }, s[1]),
-					E('div', { 'class': 'cbi-value-field' }, s[2]) ]);
-			})),
+				_("Items of 'Show Menu' on the display; 'EXIT menu' is always last. Conditional item shows the action opposite to the current state, e.g. STANDBY ON.")),
+			list,
 			E('div', { 'style': 'margin-top:.9em' }, [
+				E('button', { 'type': 'button', 'class': 'btn cbi-button cbi-button-add', 'style': 'margin-right:.4em',
+					'click': function() { services.then(function(svc) { addRow(svc, 'simple', ''); }); } }, '+ ' + _('New item')),
 				E('button', { 'class': 'btn cbi-button cbi-button-save',
 					'click': ui.createHandlerFn(this, function() {
-						return sels.reduce(function(p, s) {
-							return p.then(function() { return fs.exec(BSH, [ 'smsmode', s[0], s[2].value ]); });
-						}, Promise.resolve()).then(function() { api.flashSaved(status); });
+						var items = Array.prototype.map.call(list.children, function(row) {
+							var v = row.e750vals();
+							return v.cmd.trim() ? v.ct + ' ' + v.cmd.trim() : '';
+						}).filter(Boolean);
+						return fs.exec(BSH, [ 'e750menu' ].concat(items)).then(function(res) {
+							var j = {};
+							try { j = JSON.parse(res.stdout); } catch (e) {}
+							if (!j.ok) { throw new Error(j.error || res.stderr || _('Save failed')); }
+							api.flashSaved(status);
+						}).catch(function(e) {
+							status.textContent = String((e && e.message) || e);
+							status.style.color = '#e5484d';
+						});
 					}) }, _('Save')), status ])
 		]);
+	},
+
+	// card after the buttons: "GL-E750 Menu"
+	cards: function(data, api) {
+		var f = document.createDocumentFragment();
+		f.appendChild(this.menuCard(api));
+		return f;
 	},
 
 	// SMS settings, group "receive": display options before 'bnumber', display as notification "LED"
@@ -179,7 +287,7 @@ return baseclass.extend({
 		o.depends('mcu_sms', '1');
 
 		o = s.option(form.Value, 'mcu_time', _('Time to display messages, seconds'),
-			_("Timer restarts on input. Configure actions in 'Buttons'."));
+			_('Timer restarts on input.'));
 		o.datatype = 'range(1,900)';
 		o.depends('mcu_sms', '1');
 

@@ -1,7 +1,13 @@
 # /usr/share/mcu-switch/lib.sh — shared by /usr/bin/mcu-switch and its modules (sourced, busybox ash)
 # Screen: 'msg' frames (4x16) written straight to the MCU tty, 20 s pop-up or until the next frame.
+# A mode sends display_mask 0 (MCU screens off: a short press keeps our pop-up); the mcu daemon sends nothing while a mode
+# is on, restores the MCU screens when the owner exits and shows the mode's final pop-up (FIN) again.
+# Long press: the MCU shows its own "Standby mode" at once; the daemon covers it with LP (reaction of the SMS/metrics/menu
+# mode, which gets the press from the daemon) or LPG (first frame of the long press action). Frames >= 40 ms apart.
 PID=/tmp/mcu-switch.pid PEND=/tmp/mcu-switch.pend IN=/tmp/mcu-switch.in GEN=/tmp/mcu-switch.gen ARGS="$*"
-LP=/tmp/mcu-switch.long BOOT=/tmp/mcu-switch.boot
+SCR=/tmp/mcu-switch.scr FIN=/tmp/mcu-switch.fin MASK=/tmp/mcu-switch.mask BOOT=/tmp/mcu-switch.boot
+LP=/tmp/mcu-switch.lp LPG=/tmp/mcu-switch.lpg MF=/tmp/mcu-switch.menuf
+FMT='{"msg": "%-16.16s%-16.16s%-16.16s%-16.16s"}'
 . /lib/functions.sh
 config_load mcu
 config_get REFRESH switch refresh 2
@@ -19,6 +25,8 @@ err() { logger -t mcu-switch -p user.err "$*"; }
 now() { read -r UPC _ < /proc/uptime; UP=${UPC%.*}; UPC=$UP${UPC#*.}; }       # s and cs, no fork
 rj()  { R=$2; while [ ${#R} -lt "$1" ]; do R=" $R"; done; }                   # right-justify $2 to $1 -> R
 lj()  { R=$2; while [ ${#R} -lt "$1" ]; do R="$R "; done; }                   # left-justify
+cen() { rj $(((16 + ${#1}) / 2)) "$1"; }                                       # centre on a 16-char row
+up()  { R=$(printf %s "$1" | tr a-z A-Z); }                                    # caps
 nap() {                                                                       # sleep $1 s; returns at once on a trapped signal
    case $1 in                                                                 # OpenWrt busybox sleep: no fractions -> ucode
       *.*) set -- "${1#*.}000" "${1%.*}"; set -- "${1%"${1#???}"}" "$2"
@@ -103,17 +111,24 @@ rows() {                                                       # R2..R4: conns, 
 }
 mine() { [ -z "$ME" ] && return 0; read -r p _ 2>/dev/null < "$PID"; [ "$p" = "$ME" ] || { log "screen lost: exit"; exit 0; }; }
 
-send() {                                                                      # rows -> MCU pop-up (20 s or until next)
-    mine; printf "{\"msg\": \"%-16.16s%-16.16s%-16.16s%-16.16s\"}" "$@" > "$TTY" || [ -n "$WE" ] || { WE=1; err "cannot write $TTY"; }
+send() {                                                                      # rows -> MCU pop-up (20 s or until next); SCR: the daemon covers a long press with it
+    mine; printf "$FMT" "$@" > "$SCR"; printf "$FMT" "$@" > "$TTY" || [ -n "$WE" ] || { WE=1; err "cannot write $TTY"; }; nap 0.05      # line idle >= 40 ms
 }
 say() { send "" "$@"; }                                        # status on row 2, detail on row 3; row 1 blank as MCU's own messages
-mcuref() { ubus -t 3 call mcu reload >/dev/null 2>&1; }      # daemon sends a status frame now (1-3 s)
-clr() { mine; [ -e "$LP" ] || printf '{"msg": " "}' > "$TTY"; }   # dismiss pop-up; after a long press the daemon does it with the ps resync
+lpw() { printf "$FMT" "$@" > "$LP"; }                         # mode's long press reaction: the daemon shows it at once
+final() {                                                      # mode ends: $1 caps, centred on row 2; $2 detail, row 3; stays 20 s or until a press
+   local a b=
+   up "$1"; cen "$R"; a=$R
+   [ -z "$2" ] || { cen "$2"; b=$R; }
+   send "" "$a" "$b"; printf "$FMT" "" "$a" "$b" "" > "$FIN"      # FIN: daemon sends it again after the restore
+   ( lpg ) >/dev/null 2>&1 &                                   # state may have changed: next long press frame
+}
 owner() { OP= OK=; [ -f "$PID" ] && read -r OP OK < "$PID"; [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null || OP= OK=; }
-own() {                                                        # take the screen as kind $1: f flip, a action, r module, m metrics, s SMS, t standby
+own() {                                                        # take the screen as kind $1: f flip, a action, r module, m metrics, s SMS, t standby, n menu
    [ -n "$MCU_GEN" ] && { read -r p 2>/dev/null < "$GEN"; [ "$p" = "$MCU_GEN" ] || { log "$ARGS: superseded sequence: skipped"; exit 0; }; }
    echo "${MCU_GEN:-$$}" > "$GEN"                              # gesture sequence id: a later one skips our next calls
-   owner; echo "$$ $1" > "$PID"; ME=$$; [ -n "$OP" ] && [ "$OP" != $$ ] && [ "$OP" != "$MCU_GEN" ] && kill "$OP" 2>/dev/null
+   owner; echo "$$ $1" > "$PID"; ME=$$; : > "$FIN"; : > "$LP"; [ -n "$OP" ] && [ "$OP" != $$ ] && [ "$OP" != "$MCU_GEN" ] && kill "$OP" 2>/dev/null
+   [ -n "$OP" ] || { : > "$MASK"; [ -n "$MCU_LP" ] || { printf '{"display_mask": "0"}' > "$TTY"; nap 0.04; }; } 2>/dev/null   # screen was free: MCU screens off (MCU_LP: daemon did); MASK: daemon restores them
    trap '[ -s "$PID" ] && read -r p _ < "$PID" && [ "$p" = $$ ] && : > "$PID"' EXIT
 }
 SIG=/tmp/mcu-switch.sig

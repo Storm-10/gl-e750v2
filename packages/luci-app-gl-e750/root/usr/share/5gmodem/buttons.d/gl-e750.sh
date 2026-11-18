@@ -19,10 +19,15 @@ _ext_cond() {
 }
 
 _ext_detect() {
-	printf '"gl_e750":{"flip":"%s","double":"%s","long":"%s","en":{"pressed":"%s","released":"%s","double":"%s"}},' \
-		"$(uci -q get "$CFG.sms.mcu_flip")" "$(uci -q get "$CFG.sms.mcu_double")" "$(uci -q get "$CFG.sms.mcu_long")" \
-		"$(uci -q get "$CFG.btn_BTN_0.en_pressed")" "$(uci -q get "$CFG.btn_BTN_0.en_released")" \
-		"$(uci -q get "$CFG.btn_BTN_0.en_double")"
+	printf '"gl_e750":{"gest":"%s","en":{"pressed":"%s","released":"%s","double":"%s"},"menu":[%s]},' \
+		"$(uci -q get mcu.switch.gesture)" "$(uci -q get "$CFG.btn_BTN_0.en_pressed")" "$(uci -q get "$CFG.btn_BTN_0.en_released")" \
+		"$(uci -q get "$CFG.btn_BTN_0.en_double")" "$(_e750menu)"
+}
+
+_e750menu() {				# display menu (mcu-switch menu): mcu.menu.item '<type> <command>' -> ["type","command"],...
+	( . /lib/functions.sh; _c=
+	  _i() { printf '%s["%s","%s"]' "$_c" "${1%% *}" "$(printf '%s' "${1#* }" | _json_esc)"; _c=,; }
+	  config_load mcu; config_list_foreach menu item _i )
 }
 
 # slide switch: mcu-switch (/etc/rc.button/BTN_0) tells flips from gestures and runs the action; the plain hotplug event is skipped
@@ -30,15 +35,29 @@ _ext_run() { [ "$1" != BTN_0 ] || [ -n "$MCU_GEN" ]; }
 
 _ext_cmd() {
 	case "$1" in
-		smsmode)	# Show SMS mode: smsmode <flip|double|long> <page|next|prev|replay|read|exit>
-			case "$2" in flip|double|long) ;; *) echo '{"error":"bad input"}'; return 0 ;; esac
-			case "$3" in page|next|prev|replay|read|exit) ;; *) echo '{"error":"bad action"}'; return 0 ;; esac
-			uci -q set "$CFG.sms.mcu_$2=$3" ;;
+		e750gest)	# double flip interval, s: e750gest <1-5>; /etc/config/mcu
+			case "$2" in [1-5]) ;; *) echo '{"error":"bad interval"}'; return 0 ;; esac
+			uci -q get mcu.switch >/dev/null || uci -q set mcu.switch=switch
+			uci -q set "mcu.switch.gesture=$2"; uci -q commit mcu
+			echo '{"ok":1}'
+			return 0 ;;
 		e750en)		# slide switch action on/off: e750en <pressed|released|double> <0|1>
 			case "$2" in pressed|released|double) ;; *) echo '{"error":"bad state"}'; return 0 ;; esac
 			case "$3" in 0|1) ;; *) echo '{"error":"bad value"}'; return 0 ;; esac
 			uci -q get "$CFG.btn_BTN_0" >/dev/null || { uci -q set "$CFG.btn_BTN_0=button"; uci -q set "$CFG.btn_BTN_0.name=BTN_0"; }
 			uci -q set "$CFG.btn_BTN_0.en_$2=$3" ;;
+		e750menu)	# display menu items in order: e750menu ['<simple|conditional> <command>' ...]; /etc/config/mcu
+			shift
+			for _m in "$@"; do
+				case "$_m" in simple\ ?*|conditional\ ?*) ;; *) echo '{"error":"bad item"}'; return 0 ;; esac
+				cmd_allowed "${_m#* }" || { echo '{"error":"command not allowed"}'; return 0; }
+			done
+			uci -q get mcu.menu >/dev/null || uci -q set mcu.menu=menu
+			uci -q delete mcu.menu.item
+			for _m in "$@"; do uci -q add_list "mcu.menu.item=$_m"; done
+			uci -q commit mcu
+			echo '{"ok":1}'
+			return 0 ;;
 		*) return 1 ;;
 	esac
 	uci -q commit "$CFG"

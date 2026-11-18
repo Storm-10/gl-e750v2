@@ -1,6 +1,7 @@
 # /usr/share/mcu-switch/sms.sh — mcu-switch sms [new]: SMS on the MCU screen (luci-app-5gmodem "Inbox").
 # new: called by 5gmodem sessionwatch after sms_new.json update; flashes and/or shows new messages.
-# Input while active: mcu-switch delivers flip|double|long via $IN + USR1; actions set in 5gmodem.sms.mcu_*.
+# Input via $IN + USR1 (flip: mcu-switch, long press: mcu daemon): flip next page or message; long press asks
+# "Mark all read?": flip yes, long press or 20 s no (pop-up cleared: FIN 'wipe' for the daemon's restore).
 SB=/usr/share/5gmodem/smsbridge.sh NEW=/tmp/5gmodem/sms_new.json NOTI=/tmp/mcu-switch.sms.notified
 LST=/tmp/mcu-switch.sms NB=$(printf '\302\240')                             # no-break space
 [ -x $SB ] || { err "sms: luci-app-5gmodem not installed"; exit 1; }
@@ -22,22 +23,20 @@ if [ "$2" = new ]; then                                                       # 
    F=; [ -z "$K" ] || { [ -s $NOTI ] && ! printf '%s\n' "$K" | grep -qvxF -f $NOTI; } || F=1   # a key not notified yet
    [ -n "$F" ] || { echo "$K" > $NOTI; exit 0; }
    [ "$FL$ON" != 00 ] || { echo "$K" > $NOTI; exit 0; }
-   owner; case $OK in f|a|r|t|s) log "sms: new message, screen busy ($OK): retry next round"; exit 0 ;; esac
+   owner; case $OK in f|a|r|t|s|n) log "sms: new message, screen busy ($OK): retry next round"; exit 0 ;; esac
    echo "$K" > $NOTI; log "sms: new message"
 fi
 GOT=; trap 'GOT=1' USR1; own s
 JP=; [ "$2" = new ] && [ "$ON" != 1 ] || {                                 # load while flashing
    $SB unseen all,seen "$(uci -q get 5gmodem.sms.storage)" "$(uci -q get 5gmodem.sms.readport)" > $LST.j 2>/dev/null </dev/null & JP=$!; }
-input() { GOT=; A=; read -r A < "$IN" 2>/dev/null; : > "$IN"; g "mcu_$A" ""; ACT=$R
-   [ -n "$ACT" ] || case $A in flip) ACT=page ;; double) ACT=read ;; long) ACT=exit ;; esac
-   log "sms: $A -> $ACT"; [ "$ACT" = exit ] && say "  SMS Exit"; }      # replaces MCU's own "Standby mode" at once
-bye() { nap 1; clr; log "sms: exit"; exit 0; }
+input() { GOT=; A=; read -r A < "$IN" 2>/dev/null; : > "$IN"; log "sms: $A"; }
 
 if [ "$2" = new ] && [ "$FL" = 1 ]; then         # flash display; mcu_flash s if set; or until input
    B=$(printf '\260\260\260\260\260\260\260\260\260\260\260\260\260\260\260\260')   # 0xB0: 2 thick bars, ~50% lit
    case $FT in ''|*[!0-9]*) n=2 u=53 TT=954 ;;                                      # 23 units/word + 7 between words
       *) n=$(((FT * 1000 / 167 + 7) / 30)); [ "$n" -gt 0 ] || n=1; u=$((30 * n - 7)) TT=$((FT * 100)) ;; esac
    log "sms: flash $((TT / 100))s"               # >= 167 ms: max 3 flashes/s (WCAG 2.3.1)
+   cen "NEW SMS"; lpw "" "$R"                    # long press: ends
    now; T=$UPC c=0
    while [ "$n" -gt 0 ] && [ -z "$GOT" ]; do
       o=1
@@ -49,8 +48,9 @@ if [ "$2" = new ] && [ "$FL" = 1 ]; then         # flash display; mcu_flash s if
       done
       n=$((n - 1))
    done
-   [ -n "$GOT" ] && { input; [ "$ACT" = exit ] && bye; [ "$ACT" = read ] && ON=0; }
-   [ "$ON" = 1 ] || { clr; exit 0; }
+   [ -n "$GOT" ] && { input; [ "$A" = long ] && ON=0; }
+   [ "$ON" = 1 ] || { final "NEW SMS"; exit 0; }
+   : > "$LP"
 fi
 
 kill -0 $JP 2>/dev/null && say "  SMS Load..."
@@ -62,7 +62,7 @@ N=0 U=0 Q= A=                                                                   
 while IFS='	' read -r t u k s x; do
    N=$((N + 1)); eval "T_$N=\$t U_$N=\$u K_$N=\$k S_$N=\$s X_$N=\$x"; A="$A $N"; [ "$u" = 1 ] && U=$((U + 1)) Q="$Q $N"
 done < $LST
-[ "$N" -gt 0 ] || { log "sms: no messages"; send "SMS" "No messages"; nap 3; clr; exit 0; }
+[ "$N" -gt 0 ] || { log "sms: no messages"; final "SMS DONE" "no messages"; exit 0; }
 [ "$LAST" = 1 ] || [ "$U" = 0 ] && Q=$A                                       # sequence: unread or all, newest first
 set -- $Q; NQ=$#; log "sms: $N messages, $U unread, showing $NQ"
 LG=$(uci -q get luci.main.lang)
@@ -99,18 +99,27 @@ page() { eval "send \"\$L$P\" \"\${L$((P + 1)):-}\" \"\${L$((P + 2)):-}\" \"\${L
 show() { set -- $Q; eval "I=\${$J}"; fmt "$I"; P=1 W=2; page; }      # message J of sequence Q
 read1() { eval "k=\$K_$I u=\$U_$I"; [ "$u" = 1 ] || return 0                  # mark read on the device
    $SB seen-add "$k" >/dev/null 2>&1 && eval "U_$I=0" && log "sms: $I/$N read"; }
-J=1 AUTO=1; now; E=$((UP + TO)); DL=$UPC; show
+q() { $1 "Mark all read?" "YES switch flip" " NO wait ${2}s" "    or hold 3s"; }
+ask() {                                                                       # long press: flip marks all read; long press or 20 s: no
+   local n=20
+   : > "$LP"; now; DL=$UPC
+   while [ $n -gt 0 ]; do
+      q send $n; tick 1
+      [ -n "$GOT" ] && { input; case $A in
+         flip) for i in $Q; do I=$i; read1; done; final "SMS DONE" "all marked read"; exit 0 ;;
+         long) break ;; esac; }
+      n=$((n - 1))
+   done
+   log "sms: exit"; printf wipe > "$FIN"; exit 0                             # daemon clears the pop-up: standard screen
+}
+J=1 AUTO=1; now; E=$((UP + TO)); DL=$UPC; show; q lpw 20
 while :; do
    tick "$W"; [ -n "$GOT" ] && { input; now; E=$((UP + TO)) DL=$UPC
-      case $ACT in
-         page)   AUTO=0; if [ $((P + 3)) -ge "$LN" ]; then J=$((J % NQ + 1)); show; else P=$((P + 4)); [ $((P + 3)) -gt "$LN" ] && P=$((LN - 3)); page; fi ;;
-         next)   J=$((J % NQ + 1)); show ;;
-         prev)   J=$(((J + NQ - 2) % NQ + 1)); show ;;
-         replay) AUTO=1; show ;;
-         read)   for i in $Q; do I=$i; read1; done; send "SMS" "All marked read"; nap 2; clr; exit 0 ;;
-         exit)   bye ;;
+      case $A in
+         flip) AUTO=0; if [ $((P + 3)) -ge "$LN" ]; then J=$((J % NQ + 1)); show; else P=$((P + 4)); [ $((P + 3)) -gt "$LN" ] && P=$((LN - 3)); page; fi ;;
+         long) ask ;;
       esac; continue; }
-   [ "$UP" -ge "$E" ] && { clr; log "sms: ${TO}s timeout"; exit 0; }
+   [ "$UP" -ge "$E" ] && { log "sms: ${TO}s timeout"; final "SMS DONE"; exit 0; }
    [ "$AUTO" = 1 ] || continue
    if [ $((P + 3)) -lt "$LN" ]; then P=$((P + 1)) W=1; page                  # scroll 1 line/s
    else [ "$LAST" = 1 ] || J=$((J % NQ + 1)); show; fi                       # replay last or next

@@ -20,8 +20,8 @@ set 5gmodem.sms.newsms_hook='/usr/bin/mcu-switch sms new'
 
 set 5gmodem.btn_power=button
 set 5gmodem.btn_power.name='power'
-set 5gmodem.btn_power.ct_pressed='conditional'
-set 5gmodem.btn_power.pressed='/usr/bin/mcu-switch standby'
+set 5gmodem.btn_power.ct_pressed='simple'
+set 5gmodem.btn_power.pressed='/usr/bin/mcu-switch menu'
 
 set 5gmodem.btn_BTN_0=button
 set 5gmodem.btn_BTN_0.name='BTN_0'
