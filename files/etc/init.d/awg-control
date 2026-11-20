@@ -1,0 +1,12 @@
+#!/bin/sh /etc/rc.common
+
+START=95
+USE_PROCD=1
+
+start_service() {
+	/usr/bin/awg-control init
+}
+
+reload_service() {
+	/usr/bin/awg-control reload
+}

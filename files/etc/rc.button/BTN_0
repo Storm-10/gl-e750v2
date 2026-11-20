@@ -1,11 +1,5 @@
 #!/bin/sh
-
-[ "$ACTION" = "pressed" ] && state=on
-[ "$ACTION" = "released" ] && state=off
-[ -n "$state" ] || exit 0
-
-logger -t vpn-switch "BUTTON=$BUTTON ACTION=$ACTION state=$state"
-/usr/bin/vpn-switch "$state"
-status=$?
-logger -t vpn-switch "BUTTON=$BUTTON state=$state exit=$status"
-exit "$status"
+# GL-E750 slide switch -> mcu-switch (gestures, display). Backgrounded: procd runs button handlers one at a time,
+# a 2nd flip within 'gesture' s must reach mcu-switch while the 1st still waits.
+case "$ACTION" in pressed) s=on ;; released) s=off ;; *) exit 0 ;; esac
+/usr/bin/mcu-switch flip "$s" "$SEEN" </dev/null >/dev/null 2>&1 &

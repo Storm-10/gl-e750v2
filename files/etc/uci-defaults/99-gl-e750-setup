@@ -57,5 +57,6 @@ uci commit firewall
 
 /etc/init.d/mcu enable
 /etc/init.d/mcu_shutdown enable
+/etc/init.d/awg-control enable
 
 exit 0

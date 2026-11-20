@@ -12,9 +12,10 @@ start_service() {
 	procd_set_param command /usr/bin/eco /usr/bin/mcu
 	procd_set_param env LUA_CPATH=";;/usr/lib/lua/?.so"
 	procd_set_param respawn 3600 10 0
-	# set to 1 for log debug output
+	# mcu logs to syslog itself; debug: uci set mcu.global.debug=1; uci commit mcu; ubus call mcu reload
 	procd_set_param stdout 0
-	procd_set_param stderr 0
+	# keep Lua runtime errors/tracebacks in syslog
+	procd_set_param stderr 1
 	procd_close_instance
 }
 

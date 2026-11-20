@@ -18,14 +18,17 @@ main() {
   install_kernel_patches
   copy_custom_packages
   update_and_install_feeds
+  force_passwall_packages
   copy_rootfs_files
   apply_local_patches
+  install_apk_signing_key
   write_dot_config
   clean_custom_packages
   download_sources
   build_firmware
+  collect_release_assets
   save_optional_build_cache
-  print_artifact_hint
+# print_artifact_hint
 }
 
 main "$@"

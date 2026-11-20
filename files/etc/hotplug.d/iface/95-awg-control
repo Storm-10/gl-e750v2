@@ -1,0 +1,14 @@
+#!/bin/sh
+
+vpn_interface="$(uci -q get awg-control.main.interface)"
+[ -n "$vpn_interface" ] || vpn_interface=awg0
+[ "$INTERFACE" = "$vpn_interface" ] || exit 0
+
+case "$ACTION" in
+	ifup)
+		/usr/bin/awg-control sync
+		;;
+	ifdown)
+		/usr/bin/awg-control wan
+		;;
+esac

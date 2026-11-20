@@ -19,6 +19,7 @@ This repository already vendors:
 - `amneziawg-tools`
 - `kmod-amneziawg`
 - `luci-proto-amneziawg`
+- `luci-app-gl-e750`: GL-E750 cards, presets and translations for luci-app-5gmodem (its extension hooks)
 - `luci-app-epm`
 
 Source:

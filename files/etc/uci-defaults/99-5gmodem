@@ -1,0 +1,129 @@
+#!/bin/sh
+
+[ -f /etc/config/5gmodem ] || exit 0
+
+# uci-defaults run on the first boot after every flash and sysupgrade keeps /etc/config: options are set only if missing,
+# so settings made by the user or kept from the previous release stay (v2.0.1rc: no mcu-switch, BTN_0 ran vpn-switch).
+d() { uci -q get "$1" >/dev/null || uci -q set "$1=$2"; }
+
+d 5gmodem.@5gmodem[0].esim_apdu uqmi
+
+uci -q get 5gmodem.sms >/dev/null || uci -q set 5gmodem.sms=sms
+uci -q get 5gmodem.sms.smsled >/dev/null || { uci -q set 5gmodem.sms.smsled=mcu; uci -q set 5gmodem.sms.lednotify=1; }   # lednotify: '0' in the package config
+d 5gmodem.sms.ontopsms 1
+d 5gmodem.sms.mcu_sms 0
+d 5gmodem.sms.mcu_last 0
+d 5gmodem.sms.mcu_time 30
+d 5gmodem.sms.mirror_interval 30
+d 5gmodem.sms.newsms_hook '/usr/bin/mcu-switch sms new'
+for o in mcu_flip mcu_double mcu_long; do uci -q delete 5gmodem.sms.$o; done   # unused, from test builds
+
+# power button long press (MCU): standby
+uci -q get 5gmodem.btn_power >/dev/null || uci -q batch <<'EOF'
+set 5gmodem.btn_power=button
+set 5gmodem.btn_power.name='power'
+set 5gmodem.btn_power.ct_pressed='simple'
+set 5gmodem.btn_power.pressed='/usr/bin/mcu-switch standby'
+EOF
+
+# slide switch: ON/OFF actions off (AmneziaWG presets), double flip: menu
+if uci -q get 5gmodem.btn_BTN_0 >/dev/null; then
+	o=
+	for s in pressed released; do   # set in "Buttons" of the previous release: no enable options, its actions ran
+		uci -q get 5gmodem.btn_BTN_0.en_$s >/dev/null && continue
+		[ -n "$(uci -q get 5gmodem.btn_BTN_0.$s)" ] && v=1 || v=0
+		uci -q set 5gmodem.btn_BTN_0.en_$s=$v; o=1
+	done
+	[ -z "$o" ] || uci -q delete 5gmodem.btn_BTN_0.debounce   # gesture timing is in mcu-switch
+	uci -q get 5gmodem.btn_BTN_0.double >/dev/null || uci -q get 5gmodem.btn_BTN_0.en_double >/dev/null || uci -q batch <<'EOF'
+set 5gmodem.btn_BTN_0.en_double='1'
+set 5gmodem.btn_BTN_0.ct_double='simple'
+set 5gmodem.btn_BTN_0.double='/usr/bin/mcu-switch menu'
+EOF
+else
+	uci -q batch <<'EOF'
+set 5gmodem.btn_BTN_0=button
+set 5gmodem.btn_BTN_0.name='BTN_0'
+set 5gmodem.btn_BTN_0.en_pressed='0'
+set 5gmodem.btn_BTN_0.ct_pressed='simple'
+set 5gmodem.btn_BTN_0.pressed='/usr/bin/mcu-switch awg on_full'
+set 5gmodem.btn_BTN_0.en_released='0'
+set 5gmodem.btn_BTN_0.ct_released='simple'
+set 5gmodem.btn_BTN_0.released='/usr/bin/mcu-switch awg on_split'
+set 5gmodem.btn_BTN_0.en_double='1'
+set 5gmodem.btn_BTN_0.ct_double='simple'
+set 5gmodem.btn_BTN_0.double='/usr/bin/mcu-switch menu'
+EOF
+fi
+uci commit 5gmodem
+
+# /etc/config/mcu of the previous release: only 'global'. Sections of this release added if missing (mcu-switch mirrors
+# the "Buttons" actions to switch.cmd_* at the first gesture)
+uci -q get mcu.switch >/dev/null || uci -q set mcu.switch=switch
+d mcu.switch.cmd_on ''
+d mcu.switch.cmd_off ''
+d mcu.switch.cmd_double '/usr/bin/mcu-switch menu'
+d mcu.switch.cmd_long '/usr/bin/mcu-switch standby'
+d mcu.switch.gesture 2
+d mcu.switch.refresh 2
+d mcu.switch.meters_timeout 600
+d mcu.switch.iface wwan0
+uci -q get mcu.menu >/dev/null || uci -q batch <<'EOF'
+set mcu.menu=menu
+set mcu.menu.intro='3'
+add_list mcu.menu.item='conditional /usr/bin/mcu-switch standby'
+add_list mcu.menu.item='simple /usr/bin/mcu-switch sms'
+add_list mcu.menu.item='simple /usr/bin/mcu-switch metrics'
+add_list mcu.menu.item='simple /usr/share/5gmodem/reboot_modem.sh soft'
+EOF
+uci -q get mcu.pw >/dev/null || uci -q batch <<'EOF'
+set mcu.pw=module
+set mcu.pw.name='PW'
+set mcu.pw.cmd_on="uci set passwall2.@global[0].enabled='1'; uci commit passwall2; /etc/init.d/passwall2 restart"
+set mcu.pw.cmd_off="uci set passwall2.@global[0].enabled='0'; uci commit passwall2; /etc/init.d/passwall2 stop"
+set mcu.pw.is_on='[ "$(uci -q get passwall2.@global[0].enabled)" = 1 ]'
+add_list mcu.pw.log='/tmp/log/passwall2.log'
+set mcu.pw.done_re='Running complete'
+set mcu.pw.done_re_off='closing related programs and cache complete'
+set mcu.pw.estimate='300'
+set mcu.pw.grace='60'
+set mcu.pw.stabilize='180'
+set mcu.pw.cpu_ok='50'
+EOF
+uci -q get mcu.awg >/dev/null || uci -q batch <<'EOF'
+set mcu.awg=module
+set mcu.awg.name='AWG'
+set mcu.awg.cmd_on_full='/usr/bin/awg-control on_full'
+set mcu.awg.cmd_on_split='/usr/bin/awg-control on_split'
+set mcu.awg.cmd_off='/usr/bin/awg-control off'
+set mcu.awg.is_on_full='/usr/bin/awg-control is on_full'
+set mcu.awg.is_on_split='/usr/bin/awg-control is on_split'
+set mcu.awg.is_off='/usr/bin/awg-control is off'
+set mcu.awg.ok_on_full='FULL CHANNEL'
+set mcu.awg.ok_on_split='SPLIT CHANN.'
+set mcu.awg.estimate='30'
+set mcu.awg.grace='30'
+set mcu.awg.stabilize='0'
+EOF
+# vpn-switch settings of the previous release -> awg-control; vpn_interface and vpn_enabled stay (mcu VPN screen)
+if uci -q get mcu.global.vpn_zone >/dev/null; then
+	uci -q get awg-control.main >/dev/null || uci -q set awg-control.main=main
+	for o in interface:vpn_interface zone:vpn_zone lan_subnet:vpn_lan_subnet lan_device:vpn_lan_device \
+		route_table:vpn_route_table rule_priority:vpn_rule_priority; do
+		v=$(uci -q get mcu.global.${o#*:}) && [ -n "$v" ] && uci -q set awg-control.main.${o%%:*}="$v"
+		[ "${o%%:*}" = interface ] || uci -q delete mcu.global.${o#*:}
+	done
+	uci commit awg-control
+fi
+uci commit mcu
+
+/etc/init.d/5gmodem-mm-inhibit stop
+/etc/init.d/5gmodem-mm-inhibit disable
+
+# wan is proto qmi (uqmi): ModemManager only competes for /dev/cdc-wdm0. 5gmodem starts it on demand (mmneed.sh).
+[ "$(uci -q get network.wan.proto)" = modemmanager ] || [ ! -x /etc/init.d/modemmanager ] || {
+	/etc/init.d/modemmanager stop
+	/etc/init.d/modemmanager disable
+}
+
+exit 0

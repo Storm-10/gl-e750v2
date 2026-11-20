@@ -1,0 +1,84 @@
+diff --git a/feeds/passwall_luci/luci-app-passwall2/luasrc/passwall2/util_xray.lua b/feeds/passwall_luci/luci-app-passwall2/luasrc/passwall2/util_xray.lua
+--- a/feeds/passwall_luci/luci-app-passwall2/luasrc/passwall2/util_xray.lua
++++ b/feeds/passwall_luci/luci-app-passwall2/luasrc/passwall2/util_xray.lua
+@@ -2085,6 +2085,8 @@
+ 					[0] = {
+ 						-- handshake = 4,
+ 						-- connIdle = 300,
++						-- Close idle connections at 60 s
++						connIdle = 30,
+ 						-- uplinkOnly = 2,
+ 						-- downlinkOnly = 5,
+ 						bufferSize = xray_settings.buffer_size and tonumber(xray_settings.buffer_size) or nil,
+diff --git a/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/app.sh b/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/app.sh
+--- a/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/app.sh
++++ b/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/app.sh
+@@ -909,10 +909,12 @@
+ 	get_config
+ 	export V2RAY_LOCATION_ASSET=$(config_n_get @global_rules[0] v2ray_location_asset "/usr/share/v2ray/")
+ 	export XRAY_LOCATION_ASSET=$V2RAY_LOCATION_ASSET
++   # Lower GOMEMLIMIT, ulimit -n for devices with 128MB
++   export GOMEMLIMIT=56MiB
+ 	export ENABLE_DEPRECATED_GEOSITE=true
+ 	export ENABLE_DEPRECATED_GEOIP=true
+ 	export SS_SYSTEM_DNS_RESOLVER_FORCE_BUILTIN=1
+-	ulimit -n 65535
++	ulimit -n 2048
+ 	start_haproxy
+ 	start_socks
+ 	nftflag=0
+diff --git a/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/monitor.sh b/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/monitor.sh
+--- a/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/monitor.sh
++++ b/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/monitor.sh
+@@ -23,6 +23,7 @@
+ 			if [ $icount = 0 ]; then
+ 				log 0 "${cmd} crashed, restarting."
+ 				eval $(echo "nohup ${cmd} 2>&1 &") >/dev/null 2>&1 &
++				(sleep 2; xray_cgroup_add) &
+ 			fi
+ 		done
+ 	}
+diff --git a/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/utils.sh b/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/utils.sh
+--- a/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/utils.sh
++++ b/feeds/passwall_luci/luci-app-passwall2/root/usr/share/passwall2/utils.sh
+@@ -367,6 +367,24 @@
+ 	}
+ }
+ 
++# Allow lowering xray CPU time down to 1%
++XRAY_CGROUP=/sys/fs/cgroup/xray
++
++xray_cgroup_add() {
++	[ -f /sys/fs/cgroup/cgroup.controllers ] || return 0
++	[ -d "$XRAY_CGROUP" ] || { 
++		echo "+cpu" > /sys/fs/cgroup/cgroup.subtree_control
++		mkdir "$XRAY_CGROUP"
++		echo 1 > "$XRAY_CGROUP/cpu.weight"
++	}
++	mkdir -p "$XRAY_CGROUP" 2>/dev/null || return 0
++	local pid
++	for pid in ${1:-$(pidof xray)}; do
++		log 1 "adding xray pid: $pid to $XRAY_CGROUP/cgroup.procs"
++		echo "$pid" > "$XRAY_CGROUP/cgroup.procs"
++	done
++}
++
+ ln_run() {
+ 	local queue_run=${1}
+ 	local file_func=${2}
+@@ -396,6 +414,7 @@
+ 	}
+ 
+ 	${file_func:-log 1 "${ln_name}"} "$@" >${output} 2>&1 &
++	[ "${ln_name}" = "xray" ] && xray_cgroup_add $!
+ 
+ 	[ -n "$NO_REC_PROCESS" ] && return
+ 
+@@ -416,6 +435,7 @@
+ 			fi
+ 			mv -f ${TMP_PROCESS_LIST_PATH}/${filename} ${TMP_SCRIPT_FUNC_PATH}/queued_${filename}
+ 		done
++		(sleep 2; xray_cgroup_add) &
+ 	}
+ 	rm -rf ${TMP_PROCESS_LIST_PATH}
+ }
