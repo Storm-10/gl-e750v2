@@ -102,3 +102,48 @@ msgstr "このモードは「受信箱」で設定した場合にも有効にな
 
 msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
 msgstr "状態の概要ページと GL-E750 のディスプレイに新着メッセージの通知アイコンを表示する"
+
+msgid "Save failed"
+msgstr "保存に失敗しました"
+
+msgid "Show SMS on GL-E750 display. Next page by switch flip. Long press offers to mark all messages read, or exits if none is unread. Additional settings in \"Inbox\""
+msgstr "GL-E750 のディスプレイに SMS を表示します。スイッチの切り替えで次のページへ進みます。長押しすると、すべてのメッセージを既読にするか確認します。未読がなければ終了します。追加設定は「受信箱」にあります"
+
+msgid "Show Metrics"
+msgstr "メトリクスを表示"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exit by long press or automatically after 10 min."
+msgstr "GL-E750 のディスプレイにシステムメトリクスを表示します: WAN インターフェースの帯域幅、接続数、負荷、CPU 使用率、空きメモリ。2 画面目: 信号の RSRP、RSRQ、SINR、RSSI。画面はスイッチの切り替えで変わります。長押しで終了し、10 分後には自動的に終了します。"
+
+msgid "Show Menu"
+msgstr "メニューを表示"
+
+msgid "Show menu on GL-E750 display. Next item by switch flip, run selected item by long press. Exit by 'EXIT menu' item or automatically after 20 s without input. Items are set in 'GL-E750 Menu'."
+msgstr "GL-E750 のディスプレイにメニューを表示します。スイッチの切り替えで次の項目へ進み、長押しで選択した項目を実行します。「EXIT menu」項目で終了するか、入力がないまま 20 秒経つと自動的に終了します。項目は「GL-E750 メニュー」で設定します。"
+
+msgid "Flip switch and back to original position within the interval."
+msgstr "間隔内にスイッチを切り替えて元の位置に戻します。"
+
+msgid "Interval, s"
+msgstr "間隔 (秒)"
+
+msgid "Time to flip switch back for a double flip, 1-5 s. Longer: double flip is easier, but switch ON/OFF actions start later."
+msgstr "スイッチ往復でスイッチを戻すまでの時間 (1～5 秒)。長くするとスイッチ往復はしやすくなりますが、オン/オフの動作の開始が遅くなります。"
+
+msgid "Interval: whole seconds 1-5"
+msgstr "間隔: 1～5 の整数秒"
+
+msgid "Drag to reorder"
+msgstr "ドラッグして並べ替え"
+
+msgid "GL-E750 Menu"
+msgstr "GL-E750 メニュー"
+
+msgid "New item"
+msgstr "新しい項目"
+
+msgid "Items of 'Show Menu' on the display; 'EXIT menu' is always last. Conditional item shows the action opposite to the current state, e.g. STANDBY ON."
+msgstr "ディスプレイの「メニューを表示」の項目です。「EXIT menu」は常に最後です。条件付きの項目は、現在の状態と逆の動作を表示します (例: STANDBY ON)。"
+
+msgid "Timer restarts on input."
+msgstr "入力があるとタイマーはリセットされます。"

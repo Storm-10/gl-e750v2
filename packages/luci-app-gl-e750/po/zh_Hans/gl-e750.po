@@ -102,3 +102,48 @@ msgstr "如果在“收件箱”中进行了配置，此模式也会启用。下
 
 msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
 msgstr "在状态概览页和 GL-E750 显示屏显示新消息通知图标"
+
+msgid "Save failed"
+msgstr "保存失败"
+
+msgid "Show SMS on GL-E750 display. Next page by switch flip. Long press offers to mark all messages read, or exits if none is unread. Additional settings in \"Inbox\""
+msgstr "在 GL-E750 显示屏上显示短信。拨动开关翻到下一页。长按会提示将所有消息标记为已读；若没有未读消息则退出。更多设置见“收件箱”"
+
+msgid "Show Metrics"
+msgstr "显示指标"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exit by long press or automatically after 10 min."
+msgstr "在 GL-E750 显示屏上显示系统指标：WAN 接口带宽、连接数、负载、CPU 使用率、可用内存。第二屏：信号的 RSRP、RSRQ、SINR、RSSI。拨动开关切换屏幕。长按退出，或 10 分钟后自动退出。"
+
+msgid "Show Menu"
+msgstr "显示菜单"
+
+msgid "Show menu on GL-E750 display. Next item by switch flip, run selected item by long press. Exit by 'EXIT menu' item or automatically after 20 s without input. Items are set in 'GL-E750 Menu'."
+msgstr "在 GL-E750 显示屏上显示菜单。拨动开关切换到下一项，长按执行所选项。选择“EXIT menu”项退出，或 20 秒无输入后自动退出。菜单项在“GL-E750 菜单”中设置。"
+
+msgid "Flip switch and back to original position within the interval."
+msgstr "在设定的间隔内拨动开关并拨回原位。"
+
+msgid "Interval, s"
+msgstr "间隔（秒）"
+
+msgid "Time to flip switch back for a double flip, 1-5 s. Longer: double flip is easier, but switch ON/OFF actions start later."
+msgstr "双拨时拨回开关的时间，1-5 秒。越长越容易双拨，但开启/关闭操作启动越晚。"
+
+msgid "Interval: whole seconds 1-5"
+msgstr "间隔：1-5 的整数秒"
+
+msgid "Drag to reorder"
+msgstr "拖动以重新排序"
+
+msgid "GL-E750 Menu"
+msgstr "GL-E750 菜单"
+
+msgid "New item"
+msgstr "新菜单项"
+
+msgid "Items of 'Show Menu' on the display; 'EXIT menu' is always last. Conditional item shows the action opposite to the current state, e.g. STANDBY ON."
+msgstr "显示屏上“显示菜单”的菜单项；“EXIT menu”始终在最后。条件菜单项显示与当前状态相反的操作，例如 STANDBY ON。"
+
+msgid "Timer restarts on input."
+msgstr "有输入时计时器重新开始。"

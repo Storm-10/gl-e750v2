@@ -102,3 +102,48 @@ msgstr "Этот режим также включается, если это н�
 
 msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
 msgstr "Показывать значок уведомления о новом сообщении на странице обзора состояния и на дисплее GL-E750"
+
+msgid "Save failed"
+msgstr "Сохранение не удалось"
+
+msgid "Show SMS on GL-E750 display. Next page by switch flip. Long press offers to mark all messages read, or exits if none is unread. Additional settings in \"Inbox\""
+msgstr "Вывод SMS на дисплей GL-E750. Следующая страница переключателем. Долгое нажатие предлагает отметить все сообщения прочитанными или выходит, если непрочитанных нет. Дополнительные настройки - во «Входящих»"
+
+msgid "Show Metrics"
+msgstr "Показать метрики"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exit by long press or automatically after 10 min."
+msgstr "Вывод системных метрик на дисплей GL-E750: скорость через WAN-интерфейс, число соединений, нагрузка, загрузка CPU, доступная память. Второй экран: RSRP, RSRQ, SINR, RSSI сигнала. Смена экранов переключателем. Выход долгим нажатием или автоматически через 10 мин."
+
+msgid "Show Menu"
+msgstr "Показать меню"
+
+msgid "Show menu on GL-E750 display. Next item by switch flip, run selected item by long press. Exit by 'EXIT menu' item or automatically after 20 s without input. Items are set in 'GL-E750 Menu'."
+msgstr "Вывод меню на дисплей GL-E750. Следующий пункт переключателем, выполнение выбранного пункта долгим нажатием. Выход пунктом 'EXIT menu' или автоматически через 20 с без ввода. Пункты задаются в «Меню GL-E750»."
+
+msgid "Flip switch and back to original position within the interval."
+msgstr "Переключить и вернуть в исходное положение в течение интервала."
+
+msgid "Interval, s"
+msgstr "Интервал, с"
+
+msgid "Time to flip switch back for a double flip, 1-5 s. Longer: double flip is easier, but switch ON/OFF actions start later."
+msgstr "Время на возврат переключателя при двойном переключении, 1-5 с. Чем больше, тем проще двойное переключение, но действия «Переключатель ВКЛ/ВЫКЛ» запускаются позже."
+
+msgid "Interval: whole seconds 1-5"
+msgstr "Интервал: целое число секунд от 1 до 5"
+
+msgid "Drag to reorder"
+msgstr "Перетащите, чтобы изменить порядок"
+
+msgid "GL-E750 Menu"
+msgstr "Меню GL-E750"
+
+msgid "New item"
+msgstr "Новый пункт"
+
+msgid "Items of 'Show Menu' on the display; 'EXIT menu' is always last. Conditional item shows the action opposite to the current state, e.g. STANDBY ON."
+msgstr "Пункты «Показать меню» на дисплее; 'EXIT menu' всегда последний. Условный пункт показывает действие, противоположное текущему состоянию, например STANDBY ON."
+
+msgid "Timer restarts on input."
+msgstr "Таймер перезапускается при вводе."

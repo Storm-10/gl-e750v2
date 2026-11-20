@@ -102,3 +102,48 @@ msgstr "Mode ini juga aktif jika dikonfigurasi di \"Kotak masuk\". Aksi tombol d
 
 msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
 msgstr "Tampilkan ikon notifikasi pesan baru di halaman ringkasan status dan layar GL-E750"
+
+msgid "Save failed"
+msgstr "Penyimpanan gagal"
+
+msgid "Show SMS on GL-E750 display. Next page by switch flip. Long press offers to mark all messages read, or exits if none is unread. Additional settings in \"Inbox\""
+msgstr "Tampilkan SMS di layar GL-E750. Halaman berikutnya dengan menggeser sakelar. Tekan lama menawarkan untuk menandai semua pesan sudah dibaca, atau keluar jika tidak ada yang belum dibaca. Pengaturan tambahan di \"Kotak masuk\""
+
+msgid "Show Metrics"
+msgstr "Tampilkan metrik"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exit by long press or automatically after 10 min."
+msgstr "Menampilkan metrik sistem di layar GL-E750: lebar pita melalui antarmuka WAN, jumlah koneksi, beban, penggunaan CPU, memori tersedia. Layar kedua: RSRP, RSRQ, SINR, RSSI sinyal. Ganti layar dengan menggeser sakelar. Keluar dengan tekan lama atau otomatis setelah 10 menit."
+
+msgid "Show Menu"
+msgstr "Tampilkan menu"
+
+msgid "Show menu on GL-E750 display. Next item by switch flip, run selected item by long press. Exit by 'EXIT menu' item or automatically after 20 s without input. Items are set in 'GL-E750 Menu'."
+msgstr "Tampilkan menu di layar GL-E750. Item berikutnya dengan menggeser sakelar, jalankan item terpilih dengan tekan lama. Keluar dengan item 'EXIT menu' atau otomatis setelah 20 detik tanpa input. Item diatur di \"Menu GL-E750\"."
+
+msgid "Flip switch and back to original position within the interval."
+msgstr "Geser sakelar lalu kembalikan ke posisi semula dalam interval."
+
+msgid "Interval, s"
+msgstr "Interval, dtk"
+
+msgid "Time to flip switch back for a double flip, 1-5 s. Longer: double flip is easier, but switch ON/OFF actions start later."
+msgstr "Waktu untuk mengembalikan sakelar pada geser ganda, 1-5 detik. Lebih lama: geser ganda lebih mudah, tetapi aksi Nyalakan/Matikan dimulai lebih lambat."
+
+msgid "Interval: whole seconds 1-5"
+msgstr "Interval: bilangan bulat 1-5 detik"
+
+msgid "Drag to reorder"
+msgstr "Seret untuk mengubah urutan"
+
+msgid "GL-E750 Menu"
+msgstr "Menu GL-E750"
+
+msgid "New item"
+msgstr "Item baru"
+
+msgid "Items of 'Show Menu' on the display; 'EXIT menu' is always last. Conditional item shows the action opposite to the current state, e.g. STANDBY ON."
+msgstr "Item \"Tampilkan menu\" di layar; 'EXIT menu' selalu terakhir. Item bersyarat menampilkan aksi kebalikan dari status saat ini, mis. STANDBY ON."
+
+msgid "Timer restarts on input."
+msgstr "Timer dimulai ulang saat ada input."

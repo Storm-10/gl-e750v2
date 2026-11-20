@@ -102,3 +102,48 @@ msgstr "Chế độ này cũng được kích hoạt nếu được cấu hình 
 
 msgid "Show the new-message notification icon on the status overview page and GL-E750 display"
 msgstr "Hiện biểu tượng thông báo tin nhắn mới trên trang tổng quan trạng thái và màn hình GL-E750"
+
+msgid "Save failed"
+msgstr "Lưu thất bại"
+
+msgid "Show SMS on GL-E750 display. Next page by switch flip. Long press offers to mark all messages read, or exits if none is unread. Additional settings in \"Inbox\""
+msgstr "Hiển thị SMS trên màn hình GL-E750. Gạt công tắc để sang trang tiếp theo. Nhấn giữ sẽ đề nghị đánh dấu tất cả tin nhắn đã đọc, hoặc thoát nếu không còn tin chưa đọc. Cài đặt bổ sung trong \"Hộp thư đến\""
+
+msgid "Show Metrics"
+msgstr "Hiển thị chỉ số"
+
+msgid "Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exit by long press or automatically after 10 min."
+msgstr "Hiển thị chỉ số hệ thống trên màn hình GL-E750: băng thông qua giao diện WAN, số kết nối, tải, mức sử dụng CPU, bộ nhớ còn trống. Màn hình thứ hai: RSRP, RSRQ, SINR, RSSI của tín hiệu. Gạt công tắc để đổi màn hình. Thoát bằng nhấn giữ hoặc tự động sau 10 phút."
+
+msgid "Show Menu"
+msgstr "Hiển thị menu"
+
+msgid "Show menu on GL-E750 display. Next item by switch flip, run selected item by long press. Exit by 'EXIT menu' item or automatically after 20 s without input. Items are set in 'GL-E750 Menu'."
+msgstr "Hiển thị menu trên màn hình GL-E750. Gạt công tắc để sang mục tiếp theo, nhấn giữ để chạy mục đã chọn. Thoát bằng mục 'EXIT menu' hoặc tự động sau 20 giây không có thao tác. Các mục được cấu hình trong \"Menu GL-E750\"."
+
+msgid "Flip switch and back to original position within the interval."
+msgstr "Gạt công tắc rồi trả về vị trí ban đầu trong khoảng thời gian đã đặt."
+
+msgid "Interval, s"
+msgstr "Khoảng thời gian, s"
+
+msgid "Time to flip switch back for a double flip, 1-5 s. Longer: double flip is easier, but switch ON/OFF actions start later."
+msgstr "Thời gian để gạt công tắc trở lại khi gạt kép, 1-5 giây. Dài hơn: gạt kép dễ hơn, nhưng thao tác BẬT/TẮT bắt đầu chậm hơn."
+
+msgid "Interval: whole seconds 1-5"
+msgstr "Khoảng thời gian: số giây nguyên từ 1 đến 5"
+
+msgid "Drag to reorder"
+msgstr "Kéo để sắp xếp lại"
+
+msgid "GL-E750 Menu"
+msgstr "Menu GL-E750"
+
+msgid "New item"
+msgstr "Mục mới"
+
+msgid "Items of 'Show Menu' on the display; 'EXIT menu' is always last. Conditional item shows the action opposite to the current state, e.g. STANDBY ON."
+msgstr "Các mục của \"Hiển thị menu\" trên màn hình; 'EXIT menu' luôn ở cuối. Mục có điều kiện hiển thị thao tác ngược với trạng thái hiện tại, ví dụ STANDBY ON."
+
+msgid "Timer restarts on input."
+msgstr "Bộ đếm giờ khởi động lại khi có thao tác."
