@@ -1,7 +1,7 @@
 # /usr/share/mcu-switch/sms.sh — mcu-switch sms [new]: SMS on the MCU screen (luci-app-5gmodem "Inbox").
 # new: called by 5gmodem sessionwatch after sms_new.json update; flashes and/or shows new messages.
 # Input via $IN + USR1 (flip: mcu-switch, long press: mcu daemon): flip next page or message; long press asks
-# "Mark all read?": flip yes, long press or 20 s no (pop-up cleared: FIN 'wipe' for the daemon's restore).
+# "Mark all read?" (unread only, else long press exits): flip yes, long press or 20 s no; each ends with "SMS DONE".
 SB=/usr/share/5gmodem/smsbridge.sh NEW=/tmp/5gmodem/sms_new.json NOTI=/tmp/mcu-switch.sms.notified
 LST=/tmp/mcu-switch.sms NB=$(printf '\302\240')                             # no-break space
 [ -x $SB ] || { err "sms: luci-app-5gmodem not installed"; exit 1; }
@@ -102,7 +102,7 @@ read1() { eval "k=\$K_$I u=\$U_$I"; [ "$u" = 1 ] || return 0                  # 
 q() { $1 "Mark all read?" "YES switch flip" " NO wait ${2}s" "    or hold 3s"; }
 ask() {                                                                       # long press: flip marks all read; long press or 20 s: no
    local n=20
-   : > "$LP"; now; DL=$UPC
+   cen "SMS DONE"; lpw "" "$R"; now; DL=$UPC                                 # long press: the daemon covers the pop-up with the final
    while [ $n -gt 0 ]; do
       q send $n; tick 1
       [ -n "$GOT" ] && { input; case $A in
@@ -110,14 +110,15 @@ ask() {                                                                       # 
          long) break ;; esac; }
       n=$((n - 1))
    done
-   log "sms: exit"; printf wipe > "$FIN"; exit 0                             # daemon clears the pop-up: standard screen
+   log "sms: exit"; final "SMS DONE"; exit 0                                 # replaces the pop-up: a msg "" frame does not clear it
 }
-J=1 AUTO=1; now; E=$((UP + TO)); DL=$UPC; show; q lpw 20
+J=1 AUTO=1; now; E=$((UP + TO)); DL=$UPC; show
+[ "$U" = 0 ] && { cen "SMS DONE"; lpw "" "$R"; } || q lpw 20                # no unread: long press exits
 while :; do
    tick "$W"; [ -n "$GOT" ] && { input; now; E=$((UP + TO)) DL=$UPC
       case $A in
          flip) AUTO=0; if [ $((P + 3)) -ge "$LN" ]; then J=$((J % NQ + 1)); show; else P=$((P + 4)); [ $((P + 3)) -gt "$LN" ] && P=$((LN - 3)); page; fi ;;
-         long) ask ;;
+         long) [ "$U" = 0 ] && { log "sms: exit: long press"; final "SMS DONE"; exit 0; }; ask ;;
       esac; continue; }
    [ "$UP" -ge "$E" ] && { log "sms: ${TO}s timeout"; final "SMS DONE"; exit 0; }
    [ "$AUTO" = 1 ] || continue

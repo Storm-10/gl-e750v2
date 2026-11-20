@@ -58,6 +58,10 @@ _ext_cmd() {
 			uci -q commit mcu
 			echo '{"ok":1}'
 			return 0 ;;
+		e750lpg)	# after a save: mcu-switch mirrors the actions to /etc/config/mcu and rewrites its long press frame
+			[ ! -x /usr/bin/mcu-switch ] || /usr/bin/mcu-switch lpg </dev/null >/dev/null 2>&1
+			echo '{"ok":1}'
+			return 0 ;;
 		*) return 1 ;;
 	esac
 	uci -q commit "$CFG"

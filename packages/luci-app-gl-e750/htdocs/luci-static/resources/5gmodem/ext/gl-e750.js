@@ -14,30 +14,57 @@ var noMenu = false;	// presets of menu items: no menu in the menu
 
 function has(services, s) { return (services || []).indexOf(s) >= 0; }
 
-function sep() { return E('hr', { 'style': 'border:0;border-top:1px solid rgba(127,127,127,.2);margin:1.1em 0' }); }
+function bad(status, e) {
+	status.className = 'tg-btn-status bad';
+	status.textContent = String((e && e.message) || e);
+}
+
+function run(args) {	// buttons.sh verb, '{"ok":1}' expected
+	return fs.exec(BSH, args).then(function(res) {
+		var j = {};
+		try { j = JSON.parse(res.stdout); } catch (e) {}
+		if (!j.ok) { throw new Error(j.error || res.stderr || _('Save failed')); }
+	});
+}
+
+function delBtn(click) {	// as buttons.js: trash icon
+	var b = E('button', { 'type': 'button', 'class': 'cbi-button cbi-button-negative tg-btn-ico',
+		'title': _('Delete'), 'aria-label': _('Delete'), 'click': click });
+	b.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5"/></g></svg>';
+	return b;
+}
+
+// state picker as buttons.js segmented(): heads [state, label], show(state) on click
+function stateSeg(heads, show) {
+	var wrap = E('div', { 'class': 'tg-btn-seg', 'role': 'group' });
+	heads.forEach(function(h, i) {
+		var el = E('button', { 'type': 'button', 'class': i ? '' : 'on', 'aria-pressed': String(!i) }, h[1]);
+		el.addEventListener('click', function() {
+			wrap.querySelectorAll('button').forEach(function(x) { x.classList.remove('on'); x.setAttribute('aria-pressed', 'false'); });
+			el.classList.add('on');
+			el.setAttribute('aria-pressed', 'true');
+			show(h[0]);
+		});
+		wrap.appendChild(el);
+	});
+	return wrap;
+}
 
 // sw: { on, panel } = enable toggle that shows/hides the panel
-function stateHead(label, help, sw) {
-	var t = '';
-	if (sw) {
-		t = E('span', { 'class': 'btnsw' + (sw.on ? ' on' : ''), 'role': 'switch', 'tabindex': '0',
-			'aria-checked': sw.on ? 'true' : 'false', 'aria-label': label, 'title': _('Enable action') });
-		var set = function(on) {
-			sw.on = on;
-			t.classList.toggle('on', on);
-			t.setAttribute('aria-checked', on ? 'true' : 'false');
-			sw.panel.style.display = on ? '' : 'none';
-		};
-		t.addEventListener('click', function() { set(!sw.on); });
-		t.addEventListener('keydown', function(ev) {
-			if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); set(!sw.on); }
-		});
-		set(sw.on);
-	}
-	return E('div', {}, [
-		E('div', { 'class': 'btnstate-lbl' }, label),
-		help ? E('div', { 'class': 'cbi-value-description', 'style': 'margin-top:-.3em;margin-bottom:.45em' }, help) : '',
-		t ]);
+function swToggle(label, sw) {
+	var t = E('span', { 'class': 'btnsw', 'role': 'switch', 'tabindex': '0', 'aria-label': label, 'title': _('Enable action') });
+	var set = function(on) {
+		sw.on = on;
+		t.classList.toggle('on', on);
+		t.setAttribute('aria-checked', on ? 'true' : 'false');
+		sw.panel.style.display = on ? '' : 'none';
+	};
+	t.addEventListener('click', function() { set(!sw.on); });
+	t.addEventListener('keydown', function(ev) {
+		if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); set(!sw.on); }
+	});
+	set(sw.on);
+	return t;
 }
 
 function opt(s, name) {
@@ -51,11 +78,12 @@ return baseclass.extend({
 		if (!document.getElementById('gl-e750-css')) {
 			document.head.appendChild(E('style', { 'id': 'gl-e750-css' },
 				'.btnsw[role=switch]{cursor:pointer}.btnsw[role=switch]:focus-visible{outline:2px solid var(--tg-accent);outline-offset:2px}' +
-				'.e750row{display:flex;align-items:center;gap:.4em;padding:.15em 0;border:2px solid transparent;border-width:2px 0}' +
-				'.e750row .btncmd{flex:1;min-width:0}.e750row .btncmd .cbi-value-description{display:none!important}' +
-				'.e750row>button,.e750row .btnseg{flex:none;margin:0!important}.e750row.dragging{opacity:.5}' +
-				'.e750row .btnseg{display:inline-grid;grid-template-columns:1fr 1fr}.e750row .btnseg button{font-weight:600}' +
-				'.e750row.drag-over-above{border-top-color:#0069d6}.e750row.drag-over-below{border-bottom-color:#0069d6}'));
+				'.e750en{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px}' +
+				'.e750help{flex:1 1 18em}.e750list:empty{display:none}' +
+				'.e750row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:3px 0;border:2px solid transparent;border-width:2px 0}' +
+				'.e750row .btncmd{flex:1 1 14em;min-width:0}.e750row .btncmd .cbi-value-description{display:none!important}' +
+				'.e750row>*{margin:0!important}.e750row.dragging{opacity:.5}.e750row .drag-handle{cursor:move;user-select:none;-webkit-user-select:none}' +
+				'.e750row.drag-over-above{border-top-color:var(--tg-accent)}.e750row.drag-over-below{border-bottom-color:var(--tg-accent)}'));
 		}
 	},
 
@@ -78,7 +106,7 @@ return baseclass.extend({
 			l.push({ label: _('Stop Passwall2'), cmd: MCU + ' pw off' });
 		}
 		l.push({ label: _('Show SMS'), cmd: MCU + ' sms',
-			help: _('Show SMS on GL-E750 display. Next page by switch flip. Long press offers to mark all messages read. Additional settings in "Inbox"') });
+			help: _('Show SMS on GL-E750 display. Next page by switch flip. Long press offers to mark all messages read, or exits if none is unread. Additional settings in "Inbox"') });
 		l.push({ label: _('Show Metrics'), cmd: MCU + ' metrics',
 			help: _('Output system metrics on GL-E750 display: bandwidth via WAN interface, number of connections, load, CPU usage, memory available. Second screen: RSRP, RSRQ, SINR, RSSI of the signal. Change screen by switch flip. Exit by long press or automatically after 10 min.') });
 		if (!noMenu) {
@@ -88,7 +116,7 @@ return baseclass.extend({
 		return l;
 	},
 
-	// slide switch: ON / OFF / double flip, each with an enable toggle; power button: long press
+	// slide switch: ON / OFF / double flip, each with an enable toggle; power button: long press. Layout of buttons.js cards
 	buttonCard: function(b, leds, services, onDelete, api) {
 		var isLong = (b.name === 'power');
 		if (!isLong && b.name !== 'BTN_0') { return null; }
@@ -97,68 +125,70 @@ return baseclass.extend({
 			[ 'pressed', _('Switch ON'), '' ],
 			[ 'released', _('Switch OFF'), '' ],
 			[ 'double', _('Double flip'), _('Flip switch and back to original position within the interval.') ] ];
-		var card = E('div', { 'class': 'btncard' });
+		var card = E('div', { 'class': 'cbi-section tg-btn-card', 'data-btn': b.name });
 		var status = api.saveStatus();
-		var en = {};
-
-		card.appendChild(E('button', { 'class': 'btn cbi-button cbi-button-remove btncard-del',
-			'click': ui.createHandlerFn(this, function() {
-				return api.delBinding(b.name).then(function() {
-					if (card.parentNode) { card.parentNode.removeChild(card); }
-					if (onDelete) { onDelete(b.name); }
-				});
-			}) }, _('Delete')));
+		var en = {}, wraps = {};
 
 		var panels = heads.map(function(h, i) {
-			var p = api.statePanel(b, leds, h[0], services);
-			if (!isLong) { en[h[0]] = { on: (E750.en || {})[h[0]] === '1', panel: p.node }; }
-			if (i) { card.appendChild(sep()); }
-			card.appendChild(stateHead(h[1], h[2], en[h[0]]));
-			card.appendChild(p.node);
+			var p = api.statePanel(b, leds, h[0], services), line = [];
+			if (!isLong) {
+				en[h[0]] = { on: (E750.en || {})[h[0]] === '1', panel: p.node };
+				line.push(swToggle(h[1], en[h[0]]), E('span', {}, _('Enable action')));
+			}
+			if (h[2]) { line.push(E('span', { 'class': 'tg-btn-muted e750help' }, h[2])); }
+			wraps[h[0]] = E('div', { 'style': i ? 'display:none' : '' }, [ E('div', { 'class': 'e750en' }, line), p.node ]);
 			return [ h[0], p ];
 		});
 
-		var gest = null;
+		var top = [ E('h3', { 'class': 'tg-btn-title' }, [
+			E('span', {}, [ b.label || b.name ]),
+			E('span', { 'class': 'tg-proto-badge', 'title': b.name }, b.type === 'switch' ? _('switch') : _('button')) ]),
+			E('span', { 'class': 'tg-btn-grow' }) ];
 		if (!isLong) {
-			gest = E('input', { 'type': 'number', 'class': 'cbi-input-text', 'min': '1', 'max': '5', 'step': '1',
-				'style': 'width:5em', 'value': E750.gest || '2' });
-			card.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-top:.6em' }, [
-				E('label', { 'class': 'cbi-value-title' }, _('Interval, s')),
-				E('div', { 'class': 'cbi-value-field' }, [ gest,
-					E('div', { 'class': 'cbi-value-description' },
-						_('Time to flip switch back for a double flip, 1-5 s. Longer: double flip is easier, but switch ON/OFF actions start later.')) ]) ]));
+			top.push(stateSeg(heads, function(st) {
+				Object.keys(wraps).forEach(function(k) { wraps[k].style.display = (k === st) ? '' : 'none'; });
+			}));
+		}
+		top.push(delBtn(ui.createHandlerFn(this, function() {
+			return api.delBinding(b.name).then(function() {
+				if (card.parentNode) { card.parentNode.removeChild(card); }
+				if (onDelete) { onDelete(b.name); }
+			});
+		})));
+		card.appendChild(E('div', { 'class': 'tg-btn-top' }, top));
+		heads.forEach(function(h) { card.appendChild(wraps[h[0]]); });
+
+		var gest = null, foot = [];
+		if (!isLong) {
+			gest = E('input', { 'type': 'number', 'class': 'cbi-input-text tg-btn-dbc', 'min': '1', 'max': '5', 'step': '1',
+				'aria-label': _('Interval, s'), 'value': E750.gest || '2' });
+			foot.push(E('span', {}, _('Interval, s')), gest, E('span', { 'class': 'tg-btn-muted e750help' },
+				_('Time to flip switch back for a double flip, 1-5 s. Longer: double flip is easier, but switch ON/OFF actions start later.')));
+		} else {
+			foot.push(E('span', { 'class': 'tg-btn-grow' }));
 		}
 
-		card.appendChild(E('div', { 'style': 'margin-top:.9em' }, [
-			E('button', { 'class': 'btn cbi-button cbi-button-save',
-				'click': ui.createHandlerFn(this, function() {
-					// no delay between repeats: gesture timing is in mcu-switch
-					var ops = [ function() { return api.setField(b.name, 'debounce', ''); } ];
-					if (gest) {
-						if (!/^[1-5]$/.test(gest.value)) {
-							status.textContent = _('Interval: whole seconds 1-5');
-							status.style.color = '#e5484d';
-							return;
-						}
-						ops.push(function() { return fs.exec(BSH, [ 'e750gest', gest.value ]); });
+		foot.push(status, E('button', { 'type': 'button', 'class': 'cbi-button cbi-button-action',
+			'click': ui.createHandlerFn(this, function() {
+				if (gest && !/^[1-5]$/.test(gest.value)) { bad(status, _('Interval: whole seconds 1-5')); return; }
+				var f = [ 'debounce=' ], calls = [];	// no delay between repeats: gesture timing is in mcu-switch
+				panels.forEach(function(pair) {
+					var st = pair[0], v = pair[1].getVals();
+					f.push('ct_' + st + '=' + (v.ct || ''), st + '=' + (v.cmd || ''));
+					if (v.ct === 'conditional') {
+						f.push('leds_on_' + st + '=' + (v.onLeds || ''), 'leds_off_' + st + '=' + (v.offLeds || ''));
+					} else {
+						f.push('leds_' + st + '=' + (v.simpleLeds || ''));
 					}
-					panels.forEach(function(pair) {
-						var st = pair[0], v = pair[1].getVals();
-						if (en[st]) {
-							ops.push(function() { return fs.exec(BSH, [ 'e750en', st, en[st].on ? '1' : '0' ]); });
-						}
-						ops.push(function() { return api.setField(b.name, 'ct_' + st, v.ct); });
-						ops.push(function() { return api.setField(b.name, st, v.cmd); });
-						if (v.ct === 'conditional') {
-							ops.push(function() { return api.setLeds(b.name, 'on_' + st, v.onLeds); });
-							ops.push(function() { return api.setLeds(b.name, 'off_' + st, v.offLeds); });
-						} else {
-							ops.push(function() { return api.setLeds(b.name, st, v.simpleLeds); });
-						}
-					});
-					return ops.reduce(function(p, mk) { return p.then(mk); }, Promise.resolve())
-						.then(function() { api.flashSaved(status); });
-				}) }, _('Save')), status ]));
+					if (en[st]) { calls.push([ 'e750en', st, en[st].on ? '1' : '0' ]); }
+				});
+				calls.unshift([ 'save', b.name ].concat(f));
+				if (gest) { calls.push([ 'e750gest', gest.value ]); }
+				calls.push([ 'e750lpg' ]);	// mcu-switch: mirror to /etc/config/mcu, long press frame
+				return calls.reduce(function(p, a) { return p.then(function() { return run(a); }); }, Promise.resolve())
+					.then(function() { api.flashSaved(status); }, function(e) { bad(status, e); });
+			}) }, _('Save')));
+		card.appendChild(E('div', { 'class': 'tg-btn-foot' }, foot));
 		return card;
 	},
 
@@ -168,7 +198,7 @@ return baseclass.extend({
 		var services = fs.exec(BSH, [ 'services' ]).then(function(res) {	// as buttons.js: presets depend on them
 			try { return JSON.parse(res.stdout).services || []; } catch (e) { return []; }
 		}).catch(function() { return []; });
-		var list = E('div', {});
+		var list = E('div', { 'class': 'e750list' });
 		var touch = ('ontouchstart' in window);
 		var dragged = null;
 
@@ -206,7 +236,7 @@ return baseclass.extend({
 			if (hd) { hd.parentNode.removeChild(hd); }
 			var row = E('div', { 'class': 'e750row' });
 			var handle = E('button', { 'type': 'button', 'title': _('Drag to reorder'), 'class': 'cbi-button drag-handle',
-				'style': 'cursor:move;user-select:none;-webkit-user-select:none', 'draggable': touch ? 'false' : 'true' }, '☰');
+				'draggable': touch ? 'false' : 'true' }, '☰');
 			if (touch) {
 				handle.addEventListener('touchmove', function(ev) {
 					var t = ev.touches[0], el = document.elementFromPoint(t.clientX, t.clientY);
@@ -229,39 +259,33 @@ return baseclass.extend({
 				handle.addEventListener('dragend', function() { end(false); });
 			}
 			row.e750vals = p.getVals;
-			row.appendChild(p.node.querySelector('.btnseg'));
-			row.appendChild(c);
-			row.appendChild(E('button', { 'type': 'button', 'class': 'btn cbi-button cbi-button-remove',
-				'click': function() { list.removeChild(row); } }, _('Delete')));
 			row.appendChild(handle);
+			row.appendChild(p.node.querySelector('.tg-btn-seg'));	// command type: Simple / Conditional
+			row.appendChild(c);
+			row.appendChild(delBtn(function() { list.removeChild(row); }));
 			list.appendChild(row);
 		}
 		services.then(function(svc) { (E750.menu || []).forEach(function(m) { addRow(svc, m[0], m[1]); }); });
 
-		return E('div', { 'class': 'btncard' }, [
-			E('div', { 'class': 'btnstate-lbl' }, _('GL-E750 Menu')),
-			E('div', { 'class': 'cbi-value-description', 'style': 'margin-top:-.3em;margin-bottom:.6em' },
+		return E('div', { 'class': 'cbi-section tg-btn-card' }, [
+			E('div', { 'class': 'tg-btn-top' }, [
+				E('h3', { 'class': 'tg-btn-title' }, E('span', {}, _('GL-E750 Menu'))),
+				E('span', { 'class': 'tg-btn-grow' }),
+				E('button', { 'type': 'button', 'class': 'cbi-button cbi-button-add',
+					'click': function() { services.then(function(svc) { addRow(svc, 'simple', ''); }); } }, '+ ' + _('New item')) ]),
+			E('div', { 'class': 'tg-btn-muted' },
 				_("Items of 'Show Menu' on the display; 'EXIT menu' is always last. Conditional item shows the action opposite to the current state, e.g. STANDBY ON.")),
 			list,
-			E('div', { 'style': 'margin-top:.9em' }, [
-				E('button', { 'type': 'button', 'class': 'btn cbi-button cbi-button-add', 'style': 'margin-right:.4em',
-					'click': function() { services.then(function(svc) { addRow(svc, 'simple', ''); }); } }, '+ ' + _('New item')),
-				E('button', { 'class': 'btn cbi-button cbi-button-save',
+			E('div', { 'class': 'tg-btn-foot' }, [
+				E('span', { 'class': 'tg-btn-grow' }), status,
+				E('button', { 'type': 'button', 'class': 'cbi-button cbi-button-action',
 					'click': ui.createHandlerFn(this, function() {
 						var items = Array.prototype.map.call(list.children, function(row) {
 							var v = row.e750vals();
 							return v.cmd.trim() ? v.ct + ' ' + v.cmd.trim() : '';
 						}).filter(Boolean);
-						return fs.exec(BSH, [ 'e750menu' ].concat(items)).then(function(res) {
-							var j = {};
-							try { j = JSON.parse(res.stdout); } catch (e) {}
-							if (!j.ok) { throw new Error(j.error || res.stderr || _('Save failed')); }
-							api.flashSaved(status);
-						}).catch(function(e) {
-							status.textContent = String((e && e.message) || e);
-							status.style.color = '#e5484d';
-						});
-					}) }, _('Save')), status ])
+						return run([ 'e750menu' ].concat(items)).then(function() { api.flashSaved(status); }, function(e) { bad(status, e); });
+					}) }, _('Save')) ])
 		]);
 	},
 

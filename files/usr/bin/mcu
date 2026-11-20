@@ -20,8 +20,9 @@ local last_frame              -- last status frame sent: sent again on restore
 local paused = false          -- an mcu-switch screen mode owns the display: nothing sent to the MCU
 local ps_mcu                  -- ps the MCU set itself on a power button long press; nil: in sync
 local ps_wait                 -- deadline for mcu-switch to take the screen after that long press
+local ps_hold                 -- quiet standby (LPG "quiet"): deadline for the system ps to follow the MCU's; no screen work
 local SCR = "/tmp/mcu-switch.scr"  -- last pop-up frame of the mcu-switch screen owner
-local FIN = "/tmp/mcu-switch.fin"  -- final pop-up of the ended mode: sent again after the restore; 'wipe': clear the pop-up
+local FIN = "/tmp/mcu-switch.fin"  -- final pop-up of the ended mode: sent again after the restore
 local LP = "/tmp/mcu-switch.lp"    -- long press reaction frame of the SMS/metrics/menu mode
 local LPG = "/tmp/mcu-switch.lpg"  -- first frame of the long press action (no mode on)
 local IN = "/tmp/mcu-switch.in"    -- input to the SMS/metrics/menu mode, with SIGUSR1
@@ -218,13 +219,20 @@ local function clear_power_saving()
 end
 
 -- power button held 3 s: the MCU shows its own "Standby mode" at once; cover it now with the reaction's first frame:
--- SMS/metrics/menu mode: its LP frame, then the press goes to the mode; else LPG and mcu-switch runs the action (default: menu)
+-- SMS/metrics/menu mode: its LP frame, then the press goes to the mode; else LPG and mcu-switch runs the action (default: menu; LPG "quiet" for standby)
 local function long_press(ev)
     ps_mcu = ev == "Power_Saving_on" and "1" or "0"
-    paused = true
-    last_msg = nil
     local kind, pid = screen_owner()
     local mode = kind == "s" or kind == "m" or kind == "n"
+    if not mode and file.readfile(LPG) == "quiet" then   -- action "mcu-switch standby": the MCU's screen and ps are the result
+        ps_hold = time.now() + 10
+        log.log(log.NOTICE, "power button long press (" .. ev .. "), quiet standby " .. ps_mcu)
+        spawn("MCU_PS=" .. ps_mcu .. " /usr/bin/mcu-switch long")
+        return
+    end
+    ps_hold = nil
+    paused = true
+    last_msg = nil
     ps_wait = not mode and time.now() + 5 or nil   -- mcu-switch about to take the screen; a mode may end at once (restore now)
     local f = mode and (file.readfile(LP) or "") or ""
     if f == "" then f = mode and file.readfile(SCR) or not mode and file.readfile(LPG) or "" end
@@ -423,7 +431,7 @@ function get_serial_data(dev, baudrate, data, reply_wait, drain, status)  -- rep
         end
     end
 
-    if status and (paused or screen_owner()) then   -- the drain above saw a long press, or a mode started: send nothing
+    if status and (paused or ps_hold or screen_owner()) then   -- the drain above saw a long press, or a mode started: send nothing
         data = nil
     end
 
@@ -434,6 +442,8 @@ function get_serial_data(dev, baudrate, data, reply_wait, drain, status)  -- rep
             if ps_mcu then
                 data = data:gsub('"ps": "%d"', '"ps": "' .. ps_mcu .. '"')
             end
+        elseif ps_hold then   -- quiet standby: keep the MCU's ps until the system follows
+            data = data:gsub('"ps": "%d"', '"ps": "' .. ps_mcu .. '"')
         end
         while time.now() < wire_free do
             time.sleep(wire_free - time.now())
@@ -995,15 +1005,14 @@ local function tx(d)
     get_serial_data(dev, baudrate, d, 0, 0)
 end
 
--- mode over: ps if the MCU's differs (with msg "" if FIN is 'wipe'), MCU screens back (display_mask), status, final pop-up
+-- mode over: ps if the MCU's differs, MCU screens back (display_mask), status, final pop-up
 local function restore()
     local ps = uci.cursor():get("mcu", "global", "power_saveing") or "0"
     local known = ps_mcu or (last_frame and last_frame:match('"ps": "(%d)"'))
     local fin = file.readfile(FIN) or ""
-    local wipe = fin == "wipe"
-    log.info("screen restore: MCU ps " .. tostring(known) .. ", system ps " .. ps .. (wipe and ", wipe" or ""))
-    if known ~= ps or wipe then
-        tx('{"ps": "' .. ps .. '"' .. (wipe and ', "msg": ""' or "") .. '}')
+    log.info("screen restore: MCU ps " .. tostring(known) .. ", system ps " .. ps)
+    if known ~= ps then
+        tx('{"ps": "' .. ps .. '"}')
     end
     tx('{"display_mask": "' .. mcu_set_config({}).display_mask .. '"}')
     if last_frame then
@@ -1014,7 +1023,7 @@ local function restore()
     if screen_owner() then
         tx('{"display_mask": "0"}')   -- a new mode took the screen meanwhile
     else
-        if fin ~= "" and not wipe then
+        if fin ~= "" then
             tx(fin)
         end
         os.remove(FIN)
@@ -1023,6 +1032,7 @@ local function restore()
     local w = wire_free - time.now()
     if w > 0 then time.sleep(w) end   -- line idle before mcu-switch writes again
     ps_mcu = nil
+    ps_hold = nil
     return not last_frame
 end
 
@@ -1031,6 +1041,7 @@ local function screen_check()
     local kind = screen_owner()
     if kind then
         ps_wait = nil
+        ps_hold = nil   -- a mode took the screen: its restore resyncs ps
         if not paused then
             paused = true
             log.info("status frames paused: mcu-switch mode " .. kind)
@@ -1041,6 +1052,16 @@ local function screen_check()
         return false
     end
     ps_wait = nil
+    if ps_hold then   -- quiet standby: no restore once the system ps follows the MCU's; else resync the MCU at the deadline
+        if (uci.cursor():get("mcu", "global", "power_saveing") or "0") == ps_mcu then
+            log.info("quiet standby: system ps " .. ps_mcu)
+            ps_hold, ps_mcu = nil, nil
+        elseif time.now() < ps_hold then
+            return false
+        else
+            ps_hold = nil
+        end
+    end
     if not paused and not ps_mcu and not file.access(MASK) then
         return false
     end
@@ -2028,7 +2049,7 @@ if oled_flag then
                 if screen_check() then
                     flag = 2
                 end
-                if not paused then   -- mode on: nothing sent, mcu-switch alone writes (battery/temperature not updated)
+                if not paused and not ps_hold then   -- mode on: nothing sent, mcu-switch alone writes (battery/temperature not updated)
                     timer_monitor()
                 end
             end
@@ -2056,7 +2077,7 @@ if oled_flag then
 
             -- ~5 s between status frames; meanwhile pick up MCU button events (Power_Saving_on/off) within ~1 s
             for _ = 1, 10 do
-                time.sleep(paused and 0.1 or 0.5)   -- mode on: restore the screen soon after mcu-switch exits
+                time.sleep((paused or ps_hold) and 0.1 or 0.5)   -- mode on: restore the screen soon after mcu-switch exits
                 if read_lock_flag == 0 and send_msg_lock_flag == 0 and product_test_flag ~= 1 then
                     get_serial_data(dev, baudrate)
                     if screen_check() then   -- mode ended or ps resynced: frame at once

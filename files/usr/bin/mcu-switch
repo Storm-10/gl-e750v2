@@ -2,7 +2,9 @@
 # mcu-switch — GL-E750 slide switch and power-button gestures, MCU screen modules. Events: logread -e mcu-switch
 #   flip on|off [SEEN]   /etc/rc.button/BTN_0; flip and back within 'gesture' s = double flip
 #   long                 mcu daemon, power button held 3 s (MCU 'Power_Saving_on/off'); the daemon covers the MCU's own screen
-#                        at once with LPG (written by lpg); in SMS/metrics/menu mode the daemon passes the press to the mode itself
+#                        at once with LPG (written by lpg); in SMS/metrics/menu mode the daemon passes the press to the mode itself.
+#                        Action 'mcu-switch standby' (LPG 'quiet'): MCU_PS=<MCU's ps>, the MCU's own screen stays, the system follows
+#   lpg                  after a settings change (LuCI "Buttons" save): mirror, rewrite LPG
 #   metrics | standby [on|off] | sms [new] | menu | <module> on|on_*|off     actions; module = 'module' section in /etc/config/mcu
 #   boot                 mcu daemon start; once per boot: leave standby, idle disabled radios
 # One screen mode at a time: a gesture or a new mode ends the current one; SMS, metrics and menu modes take a flip and
@@ -75,7 +77,11 @@ go() {                                                                        # 
    case "$CMD:$RC" in *mcu-switch\ *|*:143) ;; *:0) final "$G" done ;; *) final "$G" "failed ($RC)" ;; esac   # mcu-switch modes end their own way
 }
 
-lpg() { local K=; getcmd long; title; printf "$FMT" "$R1" "$R2" "$R3" "$R4" > "$LPG"; }   # long press frame for the daemon
+lpg() {                                                                       # long press frame for the daemon; 'quiet': MCU's own standby
+   local K=; getcmd long
+   case $CMD in *mcu-switch\ standby) printf quiet > "$LPG"; return ;; esac
+   title; printf "$FMT" "$R1" "$R2" "$R3" "$R4" > "$LPG"
+}
 
 tomode() { echo "$1" > "$IN"; kill -USR1 "$OP" 2>/dev/null; log "mode $OK: $1"; }       # input to SMS/metrics/menu mode
 
@@ -120,10 +126,15 @@ metrics() {                                                 # toggle; screen 1: 
 
 SBY="wireless.radio0 wireless.radio1 network.wan"                           # switched off in standby
 standby() {                                                                 # [on|off], default toggle
-   local r s o l=                                                           # mcu.global.standby_restore: what to switch back on
-   sbw "$1"; [ $W = 1 ] && r=ON s=On || r=OFF s=Off
-   own t; trap : TERM INT HUP; say "Standby Mode $s"; log "standby $r"     # as MCU's own message; superseded: finish the switch-over
-   if [ "$(uci -q get mcu.global.power_saveing || echo 0)" = $W ]; then log "standby: already $r"; final "STANDBY $r" already; return 0; fi
+   local r s o l= q=                                                        # mcu.global.standby_restore: what to switch back on
+   case $MCU_PS in 0|1) W=$MCU_PS q=1 ;; *) sbw "$1" ;; esac               # MCU_PS: quiet, the MCU already shows its standby
+   [ $W = 1 ] && r=ON s=On || r=OFF s=Off
+   trap : TERM INT HUP                                                      # superseded: finish the switch-over
+   if [ -n "$q" ]; then log "standby $r: quiet, as the MCU"
+   else own t; log "standby $r"
+      case $MCU_G in double|long|menu) ;; *) say "Standby Mode $s" ;; esac  # as MCU's own message; gestures/menu showed it as title
+   fi
+   if [ "$(uci -q get mcu.global.power_saveing || echo 0)" = $W ]; then log "standby: already $r"; [ -n "$q" ] || final "STANDBY $r" already; return 0; fi
    if [ $W = 1 ]; then
       for o in $SBY; do
          uci -q get $o >/dev/null && [ "$(uci -q get $o.disabled)" != 1 ] || continue
@@ -145,7 +156,7 @@ standby() {                                                                 # [o
       case $l in *wireless.*) wifi up ;; esac
       rm -f /tmp/5gmodem/standby
    fi
-   final "STANDBY $r"
+   [ -n "$q" ] || final "STANDBY $r"
 }
 
 phy() {                                                                     # wifi-device $1 -> R phy name
@@ -175,8 +186,13 @@ idle() {                                    # disabled radio: chip stays powered
 case "$1" in
    flip)    case "$2" in on|off) flip "$2" "$3" ;; *) exit 2 ;; esac ;;
    long)    owner; if [ "$OK" = s ] || [ "$OK" = m ] || [ "$OK" = n ]; then tomode long   # CLI; the daemon passes it to the mode itself
-            else now; T0=$UPC; K=$OK; own f; unset MCU_LP; getcmd long; title; send "$R1" "$R2" "$R3" "$R4"   # as LPG unless the setting changed
+            else getcmd long
+                 case $MCU_PS:$CMD in [01]:*mcu-switch\ standby)                  # quiet: no screen owner, no frame
+                    log "long press: quiet standby"; ( mirror ); go long; exit 0 ;; esac
+                 unset MCU_PS; now; T0=$UPC; K=$OK; own f; L=$MCU_LP; unset MCU_LP; title   # as LPG unless the setting changed
+                 [ -n "$L" ] && [ "$(printf "$FMT" "$R1" "$R2" "$R3" "$R4")" = "$(cat "$LPG" 2>/dev/null)" ] || send "$R1" "$R2" "$R3" "$R4"
                  log "long press"; ( mirror ); act long; fi ;;
+   lpg)     ( mirror ); lpg ;;
    boot)    lpg; [ -e "$BOOT" ] && exit 0; : > "$BOOT"                      # daemon restart: standby stays
             [ "$(uci -q get mcu.global.power_saveing)" = 1 ] && { log "boot: leaving standby"; ( standby off ); }
             idle ;;
@@ -185,5 +201,5 @@ case "$1" in
    sms)     . /usr/share/mcu-switch/sms.sh ;;
    menu)    . /usr/share/mcu-switch/menu.sh ;;
    *)       if [ -n "$1" ] && [ "$(uci -q get "mcu.$1")" = module ]; then . /usr/share/mcu-switch/module.sh
-            else echo "usage: $0 flip on|off [SEEN] | long | boot | metrics | standby [on|off] | sms [new] | menu | <module> on|on_*|off" >&2; exit 2; fi ;;
+            else echo "usage: $0 flip on|off [SEEN] | long | lpg | boot | metrics | standby [on|off] | sms [new] | menu | <module> on|on_*|off" >&2; exit 2; fi ;;
 esac
