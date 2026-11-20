@@ -78,7 +78,7 @@ add_list mcu.menu.item='simple /usr/share/5gmodem/reboot_modem.sh soft'
 EOF
 uci -q get mcu.pw >/dev/null || uci -q batch <<'EOF'
 set mcu.pw=module
-set mcu.pw.name='PASSWALL'
+set mcu.pw.name='PW'
 set mcu.pw.cmd_on="uci set passwall2.@global[0].enabled='1'; uci commit passwall2; /etc/init.d/passwall2 restart"
 set mcu.pw.cmd_off="uci set passwall2.@global[0].enabled='0'; uci commit passwall2; /etc/init.d/passwall2 stop"
 set mcu.pw.is_on='[ "$(uci -q get passwall2.@global[0].enabled)" = 1 ]'

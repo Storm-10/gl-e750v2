@@ -34,7 +34,7 @@ config menu 'menu'
 
 # mcu-switch <module> on|off: progress screen; done_re/log optional (else command exit)
 config module 'pw'
-	option name 'PASSWALL'
+	option name 'PW'
 	option cmd_on "uci set passwall2.@global[0].enabled='1'; uci commit passwall2; /etc/init.d/passwall2 restart"
 	option cmd_off "uci set passwall2.@global[0].enabled='0'; uci commit passwall2; /etc/init.d/passwall2 stop"
 	option is_on '[ "$(uci -q get passwall2.@global[0].enabled)" = 1 ]'
